@@ -82,6 +82,6 @@ def parse_resumes_from_folder(folder_path: str, output_file: str):
 # ----------- RUN SCRIPT -----------
 if __name__ == "__main__":
     folder_path = r"C:\Users\takbh\OneDrive\Desktop\BDA696\project\how-I-met-my-job\dataset\Resume"
-    output_file = "parsed_candidates.json"
+    output_file = "../../../../webui/parsed_candidates.json"
 
     parse_resumes_from_folder(folder_path, output_file)
