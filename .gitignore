@@ -1,0 +1,6 @@
+data
+dataset
+.venv
+job_posting.csv
+generate_sample_resume.py
+__pycache__/
