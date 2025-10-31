@@ -4,3 +4,5 @@ dataset
 job_posting.csv
 generate_sample_resume.py
 __pycache__/
+*.csv
+.csv
