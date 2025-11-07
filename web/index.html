@@ -132,7 +132,7 @@
       setOutput("Awaiting response...");
 
       try {
-        const response = await fetch("/.netlify/functions/classify", {
+        const response = await fetch("/.netlify/functions/classify-cv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(bodyObj)
