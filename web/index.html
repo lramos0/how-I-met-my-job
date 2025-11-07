@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JSON → Netlify Classify</title>
+    <style>
+    :root {
+      --bg: #0f172a; /* slate-900 */
+      --panel: #111827; /* gray-900 */
+      --muted: #94a3b8; /* slate-400 */
+      --text: #e5e7eb; /* gray-200 */
+      --accent: #22c55e; /* green-500 */
+      --accent-2: #60a5fa; /* blue-400 */
+      --danger: #ef4444; /* red-500 */
+      --border: #1f2937; /* gray-800 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 80% -10%, #1f2937 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    }
+    .card {
+      width: min(960px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: .3px; }
+    p.sub { margin: 0 0 16px; color: var(--muted); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    label { font-size: 14px; color: var(--muted); }
+    textarea, input[type="text"] {
+      width: 100%; min-height: 160px; resize: vertical;
+      background: #0b1220; color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.4; font-size: 14px;
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button {
+      appearance: none; border: 0; border-radius: 999px; padding: 10px 16px;
+      font-weight: 600; cursor: pointer; color: #081016; background: var(--accent);
+      transition: transform .06s ease, opacity .2s ease; box-shadow: 0 8px 20px rgba(34,197,94,.25);
+    }
+    button.secondary { background: #1f2937; color: var(--text); box-shadow: none; border: 1px solid var(--border); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .status { font-size: 13px; color: var(--muted); }
+    .row-2 { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px; }
+    pre {
+      margin: 0; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; max-height: 360px;
+      background: #0b1220; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 13px;
+    }
+    .error { color: var(--danger); }
+    .hint { color: var(--muted); font-size: 12px; }
+    .footer { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .tag { font-size: 12px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+    @media (min-width: 880px) {
+      .row { grid-template-columns: 1fr 1fr; }
+      textarea { min-height: 220px; }
+    }
+  </style>
+</head>
+<body>
+<main class="card">
+    <h1>Classify JSON with a Netlify Function</h1>
+    <p class="sub">Paste JSON on the left and POST to <code>/.netlify/functions/classify-cv</code>. We'll render the response below.</p>
+
+    <div class="row">
+        <section>
+            <label for="json-input">JSON input</label>
+            <textarea id="json-input" placeholder='{"text":"hello world"}'></textarea>
+            <div class="controls">
+                <button id="send">Run classify()</button>
+                <button id="prettify" class="secondary" title="Format JSON">Prettify</button>
+                <span id="status" class="status"></span>
+            </div>
+            <p id="json-error" class="error" style="display:none;"></p>
+        </section>
+
+        <section>
+            <label for="response-output">Response</label>
+            <pre id="response-output">(Nothing yet)</pre>
+            <div class="footer">
+                <span class="tag">POST → /\.netlify/functions/classify</span>
+                <span class="hint">Tip: your Netlify function must handle <code>Content-Type: application/json</code>.</span>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script>
+    const $ = (s) => document.querySelector(s);
+    const input = $("#json-input");
+    const output = $("#response-output");
+    const status = $("#status");
+    const jsonError = $("#json-error");
+
+    function setStatus(msg) { status.textContent = msg || ""; }
+    function setOutput(obj) {
+      try {
+        output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+      } catch { output.textContent = String(obj); }
+    }
+
+    $("#prettify").addEventListener("click", () => {
+      try {
+        const parsed = JSON.parse(input.value || "{}");
+        input.value = JSON.stringify(parsed, null, 2);
+        jsonError.style.display = "none";
+      } catch (e) {
+        jsonError.textContent = "Invalid JSON: " + e.message;
+        jsonError.style.display = "block";
+      }
+    });
+
+    $("#send").addEventListener("click", async () => {
+      jsonError.style.display = "none";
+
+      let bodyObj;
+      try {
+        bodyObj = input.value.trim() ? JSON.parse(input.value) : {};
+      } catch (e) {
+        jsonError.textContent = "Invalid JSON: " + e.message;
+        jsonError.style.display = "block";
+        return;
+      }
+
+      setStatus("Sending...");
+      setOutput("Awaiting response...");
+
+      try {
+        const response = await fetch("/.netlify/functions/classify-cv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyObj)
+        });
+
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          setOutput(json);
+        } catch {
+          setOutput(text);
+        }
+
+        if (!response.ok) {
+          setStatus(`Error ${response.status}`);
+        } else {
+          setStatus("Done");
+        }
+      } catch (err) {
+        setStatus("Network error");
+        setOutput(String(err));
+      }
+    });
+  </script>
+</body>
+</html>
