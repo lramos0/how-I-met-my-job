@@ -1,6 +1,6 @@
 export default async (req, context) => {
   const requestBody = await req.json();
-   const accessKeyPub = process.env.ACCESS_KEY_PUB;
+   const accessKeyPub = process.env.DBX_KEY;
    const betaPassword = process.env.BETA_PASSWORD;
   let accessKey = requestBody.accessKey;
   if (requestBody.accessKey === betaPassword) {
