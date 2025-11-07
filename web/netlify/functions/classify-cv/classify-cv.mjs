@@ -1,8 +1,12 @@
 export default async (req, context) => {
   const requestBody = await req.json();
-  const accessKey = process.env.DBX_KEY;
+  const accessKeyPub = process.env.DBX_KEY;
   const betaPassword = process.env.BETA_PASSWORD;
-  delete requestBody.accessKey;
+  let accessKey = requestBody.password;
+  if (requestBody.password == betaPassword) {
+    accessKey = accessKeyPub;
+  }
+  delete requestBody.password;
   delete requestBody.pin;
 
   if (!accessKey) {
