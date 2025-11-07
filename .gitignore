@@ -6,3 +6,5 @@ generate_sample_resume.py
 __pycache__/
 *.csv
 .csv
+app.py
+parsed_resume.json
