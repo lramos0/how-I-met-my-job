@@ -38,58 +38,26 @@ export default async (req, context) => {
     );
   }
 
-  // --- 3) Call Databricks; parse response as text first ---
-  let upstreamRes;
-  try {
-    upstreamRes = await fetch(
-      "https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/user-score/invocations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessKey}`
-        },
-        body: JSON.stringify(requestBody)
-      }
-    );
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: "Network error calling Databricks", detail: String(e) }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
-  }
+ const response = await fetch("https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/job-difficulty/invocations", {
+     method: "POST",
+     headers: {
+       "Content-Type": "application/json",
+       Authorization: `Bearer ${accessKey}`
+     },
+     body: JSON.stringify(requestBody)
+   });
 
-  const raw = await upstreamRes.text();            // never throws
-  let parsed = null;
-  try {
-    parsed = raw ? JSON.parse(raw) : null;         // tolerate empty/non-JSON bodies
-  } catch {
-    // keep parsed = null; we’ll return raw for debugging if needed
-  }
+   if (!response.ok) {
+     return new Response(JSON.stringify({ error: "Databricks request failed" }), {
+       status: response.status,
+       headers: { "Content-Type": "application/json" }
+     });
+   }
 
-  // --- 4) Bubble up upstream errors with context ---
-  if (!upstreamRes.ok) {
-    return new Response(
-      JSON.stringify({
-        error: "Databricks request failed",
-        status: upstreamRes.status,
-        statusText: upstreamRes.statusText,
-        body: parsed ?? raw ?? null
-      }),
-      { status: upstreamRes.status, headers: { "Content-Type": "application/json" } }
-    );
-  }
+   const result = await response.json();
 
-  // --- 5) Success: ensure we return valid JSON even if upstream didn't ---
-  if (!parsed || typeof parsed !== "object") {
-    return new Response(
-      JSON.stringify({ ok: true, body: raw }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  return new Response(JSON.stringify(parsed), {
-    status: 200,
-    headers: { "Content-Type": "application/json" }
-  });
+   return new Response(JSON.stringify(result), {
+     status: 200,
+     headers: { "Content-Type": "application/json" }
+   });
 };
