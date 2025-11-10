@@ -19,8 +19,8 @@ export default async (req, context) => {
   // Your current contract uses either: 
   // - requestBody.password as the token, OR
   // - requestBody.accessKey matching betaPassword to elevate to DBX_KEY
-  let accessKey = requestBody?.password || null;
-  if (requestBody?.accessKey === betaPassword) {
+  let accessKey = requestBody.password || null;
+  if (requestBody.accessKey === betaPassword) {
     accessKey = accessKeyPub;
   }
 
