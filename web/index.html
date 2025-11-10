@@ -55,14 +55,18 @@
             }
 
             function setStatus(msg) {
-                status.textContent = msg || "";
+                if (status) {
+                    status.textContent = msg || "";
+                }
             }
 
             function setOutput(obj) {
-                try {
-                    output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
-                } catch {
-                    output.textContent = String(obj);
+                if (output) {
+                    try {
+                        output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+                    } catch {
+                        output.textContent = String(obj);
+                    }
                 }
             }
 
@@ -95,7 +99,6 @@
                 });
         }
 
-        // Simulated parsing (replace this with actual backend or JS NLP later)
         async function parseResume() {
             const fileInput = document.getElementById("resumeFile");
             const status = document.getElementById("statusMsg");
@@ -122,23 +125,23 @@
                 certifications: ["Google Data Analytics", "AWS Practitioner"]
             };
 
-            // Update UI
-            response = sendJSON(resumeJSON);
+            // Call sendJSON and await the result
+            await sendJSON(resumeJSON);
 
             status.textContent = "✅ Resume parsed successfully!";
             document.getElementById("parsedOutput").innerHTML = `
-        <b>Name:</b> ${resumeJSON.name}<br>
-        <b>Email:</b> ${resumeJSON.email}<br>
-        <b>Phone:</b> ${resumeJSON.phone}<br>
-        <b>Education:</b> ${resumeJSON.education}<br>
-        <b>Experience:</b> ${resumeJSON.experience}<br>
-        <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
-        <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}
-        <b>Competitiveness Score:</b> ${response.competitiveness_score || 'N/A'}
-      `;
+                <b>Name:</b> ${resumeJSON.name}<br>
+                <b>Email:</b> ${resumeJSON.email}<br>
+                <b>Phone:</b> ${resumeJSON.phone}<br>
+                <b>Education:</b> ${resumeJSON.education}<br>
+                <b>Experience:</b> ${resumeJSON.experience}<br>
+                <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
+                <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}
+            `;
 
             document.getElementById("previewSection").classList.remove("d-none");
         }
+
 
         function downloadJSON() {
             if (!resumeJSON) {
