@@ -120,15 +120,7 @@
             await new Promise(r => setTimeout(r, 1000));
 
             // Mock parsed data (replace with real logic)
-            resumeJSON = {
-                name: "Uma Takbhate",
-                email: "umatakbhate@example.com",
-                phone: "+1 555-123-4567",
-                education: "M.S. in Business Analytics, SDSU",
-                experience: "2 years as Data Analyst at ABC Corp",
-                skills: ["Python", "Machine Learning", "SQL", "Power BI", "Streamlit"],
-                certifications: ["Google Data Analytics", "AWS Practitioner"]
-            };
+            resumeJSON = {"inputs":[{"candidate_id":"CAND-2025","full_name":"Avery Patel","location":"Seattle, WA","education_level":"Master","years_experience":5.0,"skills":["Python","Spark","a","b","c","TensorFlow","AWS","Docker"],"certifications":["AWS Solutions Architect"],"current_title":"ML Engineer","industries":["Software","FinTech"],"achievements":["Open source contributor"]}],"password":"craig123"};
 
             // Call sendJSON and await the result
             const response = await sendJSON(resumeJSON);
