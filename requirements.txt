@@ -1,4 +1,15 @@
-
+pandas
+gdown
+openpyxl
+pycountry
+ftfy
+streamlit
+spacy
+sentence-transformers
+numpy
+matplotlib
+scikit-learn
+PyMuPDF
 streamlit
 pandas
 sentence-transformers
