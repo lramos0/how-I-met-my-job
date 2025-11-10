@@ -51,7 +51,7 @@
             } catch (e) {
                 jsonError.textContent = "Invalid JSON: " + e.message;
                 jsonError.style.display = "block";
-                return;
+                return null;  // Return null in case of invalid JSON
             }
 
             function setStatus(msg) {
@@ -73,30 +73,35 @@
             setStatus("Sending...");
             setOutput("Awaiting response...");
 
-            fetch("/.netlify/functions/classify-cv", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(bodyObj)
-            })
-                .then(async (response) => {
-                    const text = await response.text();
-                    try {
-                        const json = JSON.parse(text);
-                        setOutput(json);
-                    } catch {
-                        setOutput(text);
-                    }
-
-                    if (!response.ok) {
-                        setStatus(`Error ${response.status}`);
-                    } else {
-                        setStatus("Done");
-                    }
-                })
-                .catch((err) => {
-                    setStatus("Network error");
-                    setOutput(String(err));
+            try {
+                const response = await fetch("/.netlify/functions/classify-cv", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(bodyObj)
                 });
+
+                const text = await response.text();
+                let jsonResponse;
+
+                try {
+                    jsonResponse = JSON.parse(text);  // Try parsing JSON response
+                    setOutput(jsonResponse);
+                } catch {
+                    setOutput(text);  // If not JSON, display raw response
+                }
+
+                if (!response.ok) {
+                    setStatus(`Error ${response.status}`);
+                    return null;  // Return null if response is not OK
+                } else {
+                    setStatus("Done");
+                    return jsonResponse;  // Return the parsed JSON response
+                }
+            } catch (err) {
+                setStatus("Network error");
+                setOutput(String(err));
+                return null;  // Return null in case of network error
+            }
         }
 
         async function parseResume() {
@@ -126,21 +131,32 @@
             };
 
             // Call sendJSON and await the result
-            await sendJSON(resumeJSON);
+            const response = await sendJSON(resumeJSON);
+            console.log(response);  // Log the response for debugging
 
-            status.textContent = "✅ Resume parsed successfully!";
-            document.getElementById("parsedOutput").innerHTML = `
-                <b>Name:</b> ${resumeJSON.name}<br>
-                <b>Email:</b> ${resumeJSON.email}<br>
-                <b>Phone:</b> ${resumeJSON.phone}<br>
-                <b>Education:</b> ${resumeJSON.education}<br>
-                <b>Experience:</b> ${resumeJSON.experience}<br>
-                <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
-                <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}
-            `;
+            if (response) {
+                status.textContent = "✅ Resume parsed successfully!";
 
-            document.getElementById("previewSection").classList.remove("d-none");
+                // Update the parsed output with the response
+                document.getElementById("parsedOutput").innerHTML = `
+                    <b>Name:</b> ${resumeJSON.name}<br>
+                    <b>Email:</b> ${resumeJSON.email}<br>
+                    <b>Phone:</b> ${resumeJSON.phone}<br>
+                    <b>Education:</b> ${resumeJSON.education}<br>
+                    <b>Experience:</b> ${resumeJSON.experience}<br>
+                    <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
+                    <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}<br>
+                    <b>Competitiveness:</b> ${response.competitiveness || 'N/A'}
+                `;
+
+                // Show the preview section
+                document.getElementById("previewSection").classList.remove("d-none");
+            } else {
+                // Handle the case where sendJSON returns null (error or invalid response)
+                status.textContent = "❌ Something went wrong!";
+            }
         }
+
 
 
         function downloadJSON() {
