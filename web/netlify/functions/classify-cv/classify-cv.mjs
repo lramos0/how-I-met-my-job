@@ -1,16 +1,7 @@
 // netlify/functions/classify-cv.mjs
 export default async (req, context) => {
   // --- 1) Parse incoming body safely ---
-  let requestBody = {};
-  try {
-    const raw = await req.text();                  // never throws
-    requestBody = raw ? JSON.parse(raw) : {};      // tolerate empty body
-  } catch (e) {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON in request body", detail: e.message }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
-  }
+  const requestBody = await req.json();
 
   // --- 2) Auth logic (unchanged, but safer) ---
   const accessKeyPub  = process.env.DBX_KEY;
