@@ -36,118 +36,137 @@
     </div>
 
     <script>
-        let resumeJSON = null;
+        let resumeJSON = null;let resumeJSON = null;
+
         async function sendJSON(json) {
-            const jsonError = document.getElementById("json-error");
-            const status = document.getElementById("status");
-            const output = document.getElementById("response-output");
+          const jsonError = document.getElementById("json-error");
+          const status = document.getElementById("status");
+          const output = document.getElementById("response-output");
 
+          // Helpers
+          const setStatus = (msg) => { if (status) status.textContent = msg || ""; };
+          const setOutput = (obj) => {
+            if (!output) return;
+            try {
+              output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+            } catch {
+              output.textContent = String(obj);
+            }
+          };
+
+          // Reset error banner
+          if (jsonError) {
             jsonError.style.display = "none";
+            jsonError.textContent = "";
+          }
 
-            let bodyObj;
-            try {
-                const jsonString = typeof json === "string" ? json.trim() : JSON.stringify(json);
-                bodyObj = jsonString ? JSON.parse(jsonString) : {};
-            } catch (e) {
-                jsonError.textContent = "Invalid JSON: " + e.message;
-                jsonError.style.display = "block";
-                return null;  // Return null in case of invalid JSON
+          // Normalize input to an object (or bail with a clear error)
+          let bodyObj;
+          try {
+            const jsonString = typeof json === "string" ? json.trim() : JSON.stringify(json);
+            bodyObj = jsonString ? JSON.parse(jsonString) : {};
+          } catch (e) {
+            if (jsonError) {
+              jsonError.textContent = "Invalid JSON: " + e.message;
+              jsonError.style.display = "block";
+            }
+            return null;
+          }
+
+          setStatus("Sending…");
+          setOutput("Awaiting response…");
+
+          try {
+            const response = await fetch("/.netlify/functions/classify-cv", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(bodyObj)
+            });
+
+            // Read as text first; parse JSON only if possible
+            const text = await response.text();
+            let jsonResponse = null;
+            try { jsonResponse = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+
+            if (!response.ok) {
+              setStatus(`Error ${response.status}`);
+              setOutput(jsonResponse ?? text ?? "No response body");
+              return null;
             }
 
-            function setStatus(msg) {
-                if (status) {
-                    status.textContent = msg || "";
-                }
-            }
-
-            function setOutput(obj) {
-                if (output) {
-                    try {
-                        output.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
-                    } catch {
-                        output.textContent = String(obj);
-                    }
-                }
-            }
-
-            setStatus("Sending...");
-            setOutput("Awaiting response...");
-
-            try {
-                const response = await fetch("/.netlify/functions/classify-cv", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(bodyObj)
-                });
-
-                const text = await response.text();
-                let jsonResponse;
-
-                try {
-                    jsonResponse = JSON.parse(text);  // Try parsing JSON response
-                    setOutput(jsonResponse);
-                } catch {
-                    setOutput(text);  // If not JSON, display raw response
-                }
-
-                if (!response.ok) {
-                    setStatus(`Error ${response.status}`);
-                    return null;  // Return null if response is not OK
-                } else {
-                    setStatus("Done");
-                    return jsonResponse;  // Return the parsed JSON response
-                }
-            } catch (err) {
-                setStatus("Network error");
-                setOutput(String(err));
-                return null;  // Return null in case of network error
-            }
+            setStatus("Done");
+            setOutput(jsonResponse ?? text);
+            return jsonResponse ?? text;
+          } catch (err) {
+            setStatus("Network error");
+            setOutput(String(err));
+            return null;
+          }
         }
 
         async function parseResume() {
-            const fileInput = document.getElementById("resumeFile");
-            const status = document.getElementById("statusMsg");
+          const fileInput = document.getElementById("resumeFile");
+          const status = document.getElementById("statusMsg");
 
-            if (!fileInput.files.length) {
-                alert("Please upload a resume file first.");
-                return;
-            }
+          if (!fileInput?.files?.length) {
+            alert("Please upload a resume file first.");
+            return;
+          }
 
-            const file = fileInput.files[0];
-            status.textContent = `Reading ${file.name} ...`;
+          const file = fileInput.files[0];
+          if (status) status.textContent = `Reading ${file.name} …`;
 
-            // Simulated parsing delay
-            await new Promise(r => setTimeout(r, 1000));
+          // Simulated parsing delay (replace with real parsing)
+          await new Promise((r) => setTimeout(r, 1000));
 
-            // Mock parsed data (replace with real logic)
-            resumeJSON = {"inputs":[{"candidate_id":"CAND-2025","full_name":"Avery Patel","location":"Seattle, WA","education_level":"Master","years_experience":5.0,"skills":["Python","Spark","a","b","c","TensorFlow","AWS","Docker"],"certifications":["AWS Solutions Architect"],"current_title":"ML Engineer","industries":["Software","FinTech"],"achievements":["Open source contributor"]}],"password":"craig123"};
+          // Mock parsed data (replace with your actual parsing result)
+          resumeJSON = {
+            inputs: [{
+              candidate_id: "CAND-2025",
+              full_name: "Avery Patel",
+              location: "Seattle, WA",
+              education_level: "Master",
+              years_experience: 5.0,
+              skills: ["Python", "Spark", "a", "b", "c", "TensorFlow", "AWS", "Docker"],
+              certifications: ["AWS Solutions Architect"],
+              current_title: "ML Engineer",
+              industries: ["Software", "FinTech"],
+              achievements: ["Open source contributor"]
+            }],
+            password: "craig123" // will not be displayed or logged
+          };
 
-            // Call sendJSON and await the result
-            const response = await sendJSON(resumeJSON);
-            console.log(response);  // Log the response for debugging
+          // Send to backend
+          const response = await sendJSON(resumeJSON);
+          // Avoid logging secrets
+          try {
+            const { password, ...safe } = resumeJSON || {};
+            console.log("sendJSON payload (redacted):", safe);
+          } catch {}
 
-            if (response) {
-                status.textContent = "✅ Resume parsed successfully!";
+          if (response) {
+            if (status) status.textContent = "✅ Resume parsed successfully!";
 
-                // Update the parsed output with the response
-                document.getElementById("parsedOutput").innerHTML = `
-                    <b>Name:</b> ${resumeJSON.name}<br>
-                    <b>Email:</b> ${resumeJSON.email}<br>
-                    <b>Phone:</b> ${resumeJSON.phone}<br>
-                    <b>Education:</b> ${resumeJSON.education}<br>
-                    <b>Experience:</b> ${resumeJSON.experience}<br>
-                    <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
-                    <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}<br>
-                    <b>Competitiveness:</b> ${response.competitiveness || 'N/A'}
-                `;
+            const rec = resumeJSON?.inputs?.[0] ?? {};
+            document.getElementById("parsedOutput").innerHTML = `
+              <b>Name:</b> ${rec.full_name ?? "—"}<br>
+              <b>Location:</b> ${rec.location ?? "—"}<br>
+              <b>Education:</b> ${rec.education_level ?? "—"}<br>
+              <b>Years Experience:</b> ${rec.years_experience ?? "—"}<br>
+              <b>Title:</b> ${rec.current_title ?? "—"}<br>
+              <b>Industries:</b> ${(rec.industries ?? []).join(", ") || "—"}<br>
+              <b>Skills:</b> ${(rec.skills ?? []).join(", ") || "—"}<br>
+              <b>Certifications:</b> ${(rec.certifications ?? []).join(", ") || "—"}<br>
+              <b>Achievements:</b> ${(rec.achievements ?? []).join(", ") || "—"}<br>
+              <b>Competitiveness:</b> ${(response && response.competitiveness) ? response.competitiveness : "N/A"}
+            `;
 
-                // Show the preview section
-                document.getElementById("previewSection").classList.remove("d-none");
-            } else {
-                // Handle the case where sendJSON returns null (error or invalid response)
-                status.textContent = "❌ Something went wrong!";
-            }
+            document.getElementById("previewSection")?.classList.remove("d-none");
+          } else {
+            if (status) status.textContent = "❌ Something went wrong!";
+          }
         }
+
 
 
 
