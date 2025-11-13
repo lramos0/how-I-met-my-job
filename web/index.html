@@ -157,7 +157,7 @@
               <b>Skills:</b> ${(rec.skills ?? []).join(", ") || "—"}<br>
               <b>Certifications:</b> ${(rec.certifications ?? []).join(", ") || "—"}<br>
               <b>Achievements:</b> ${(rec.achievements ?? []).join(", ") || "—"}<br>
-              <b>Competitiveness:</b> ${(response && response.competitiveness) ? response.competitiveness : "N/A"}
+              <b>Competitiveness:</b> ${(response && response.competitiveness_score) ? response.competitiveness_score : "N/A"}
             `;
 
             document.getElementById("previewSection")?.classList.remove("d-none");
