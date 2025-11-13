@@ -38,11 +38,17 @@ export default async (req, context) => {
      body: JSON.stringify(requestBody)
    });
 
-   if (!response.ok) {
-     return new Response(JSON.stringify({ error: "Databricks request failed" }), {
-       status: response.status,
-       headers: { "Content-Type": "application/json" }
-     });
+   let result = {};
+   try {
+     const text = await response.text();
+     if (text) {
+       result = JSON.parse(text);
+     } else {
+       result = { warning: "Databricks returned empty response" };
+     }
+   } catch (err) {
+     console.error("Failed to parse Databricks JSON:", err);
+     result = { error: "Invalid JSON from Databricks" };
    }
 
    const result = await response.json();
