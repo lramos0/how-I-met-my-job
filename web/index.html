@@ -146,6 +146,7 @@
 
             const rec = resumeJSON?.inputs?.[0] ?? {};
             console.log("Parsed resume data:", rec);
+            const competitiveScore = response?.predictions?.[0]?.competitive_score ?? "N/A";
 
             document.getElementById("parsedOutput").innerHTML = `
               <b>Name:</b> ${rec.full_name ?? "—"}<br>
@@ -157,7 +158,7 @@
               <b>Skills:</b> ${(rec.skills ?? []).join(", ") || "—"}<br>
               <b>Certifications:</b> ${(rec.certifications ?? []).join(", ") || "—"}<br>
               <b>Achievements:</b> ${(rec.achievements ?? []).join(", ") || "—"}<br>
-              <b>Competitiveness:</b> ${(response && response.competitiveness_score) ? response.competitiveness_score : "N/A"}
+              <b>Competitiveness:</b> ${competitiveScore}
             `;
 
             document.getElementById("previewSection")?.classList.remove("d-none");
