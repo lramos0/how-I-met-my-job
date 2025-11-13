@@ -40,27 +40,30 @@ export default async (req, context) => {
     console.log("Sending to Databricks:", JSON.stringify(requestBody, null, 2));
 
     // --- 5) Send to Databricks ---
-    const response = await fetch(
-      "https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/job-difficulty/invocations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
+    // --- Send request ---
+    const response = await fetch(DATABRICKS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
 
-    // --- 6) Read raw response text ---
-    const rawText = await response.text();
-    console.log("Databricks raw response:", rawText);
+    // --- Check status ---
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Databricks error:", response.status, text);
+      return new Response(JSON.stringify({ error: text }), { status: response.status });
+    }
 
+    // --- Parse JSON safely ---
     let result;
     try {
-      result = rawText ? JSON.parse(rawText) : { warning: "Databricks returned empty response" };
+      result = await response.json();
     } catch (err) {
-      console.error("Failed to parse Databricks JSON:", err);
+      const rawText = await response.text();
+      console.error("Failed to parse JSON:", err, rawText);
       result = { error: "Invalid JSON from Databricks", raw: rawText };
     }
 
@@ -68,12 +71,4 @@ export default async (req, context) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-
-  } catch (err) {
-    console.error("Unexpected error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
 };
