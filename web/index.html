@@ -135,18 +135,18 @@
             password: "craig123"
           };
 
+          console.log("Mock resume data:", resumeJSON);
+
           // Send to backend
           const response = await sendJSON(resumeJSON);
-          // Avoid logging secrets
-          try {
-            const { password, ...safe } = resumeJSON || {};
-            console.log("sendJSON payload (redacted):", safe);
-          } catch {}
+          console.log("Backend response:", response);
 
           if (response) {
             if (status) status.textContent = "✅ Resume parsed successfully!";
 
             const rec = resumeJSON?.inputs?.[0] ?? {};
+            console.log("Parsed resume data:", rec);
+
             document.getElementById("parsedOutput").innerHTML = `
               <b>Name:</b> ${rec.full_name ?? "—"}<br>
               <b>Location:</b> ${rec.location ?? "—"}<br>
@@ -165,8 +165,6 @@
             if (status) status.textContent = "❌ Something went wrong!";
           }
         }
-
-
 
 
         function downloadJSON() {
