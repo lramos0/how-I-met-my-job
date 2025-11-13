@@ -71,4 +71,11 @@ export default async (req, context) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-};
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return new Response(
+      JSON.stringify({ error: "Internal Server Error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}; // <-- Closing brace added here
