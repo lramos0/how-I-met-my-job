@@ -1,25 +1,24 @@
 // netlify/functions/classify-cv.mjs
 export default async (req, context) => {
   // --- 1) Parse incoming body safely ---
-  const requestBody = await req.json();
-
-  // --- 2) Auth logic (unchanged, but safer) ---
-  const accessKeyPub  = process.env.DBX_KEY;
-  const betaPassword  = process.env.BETA_PASSWORD;
-
-  // Your current contract uses either: 
-  // - requestBody.password as the token, OR
-  // - requestBody.accessKey matching betaPassword to elevate to DBX_KEY
-  let accessKey = accessKeyPub;
-  if (requestBody.accessKey === betaPassword) {
-    accessKey = accessKeyPub;
+  let requestBody = {};
+  try {
+    requestBody = await req.json();
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Invalid JSON in request body" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
   }
 
-  // Remove sensitive inputs we don't want to forward
-  if (requestBody) {
-    delete requestBody.accessKey;
-    delete requestBody.pin;
-    delete requestBody.password; // don't forward raw password to Databricks
+  // --- 2) Auth logic ---
+  const accessKeyPub = process.env.DBX_KEY;
+  const betaPassword = process.env.BETA_PASSWORD;
+
+  // Determine which key to use
+  let accessKey = accessKeyPub;
+  if (requestBody.accessKey && requestBody.accessKey === betaPassword) {
+    accessKey = accessKeyPub;
   }
 
   if (!accessKey) {
@@ -29,32 +28,59 @@ export default async (req, context) => {
     );
   }
 
- const response = await fetch("https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/job-difficulty/invocations", {
-     method: "POST",
-     headers: {
-       "Content-Type": "application/json",
-       Authorization: `Bearer ${accessKey}`
-     },
-     body: JSON.stringify(requestBody)
-   });
+  // --- 3) Redact sensitive fields before logging ---
+  const safeBody = { ...requestBody };
+  delete safeBody.accessKey;
+  delete safeBody.pin;
+  // Keep password if Databricks requires it; remove only from logs
+  const logBody = { ...safeBody };
+  delete logBody.password;
+  console.log("Sending to Databricks:", logBody);
 
-   let result = {};
-   try {
-     const text = await response.text();
-     if (text) {
-       result = JSON.parse(text);
-     } else {
-       result = { warning: "Databricks returned empty response" };
-     }
-   } catch (err) {
-     console.error("Failed to parse Databricks JSON:", err);
-     result = { error: "Invalid JSON from Databricks" };
-   }
+  // --- 4) Send request to Databricks ---
+  let dbResult = {};
+  try {
+    const response = await fetch(
+      "https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/job-difficulty/invocations",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessKey}`,
+        },
+        body: JSON.stringify(safeBody),
+      }
+    );
 
-   const result = await response.json();
+    const text = await response.text();
+    if (!text) {
+      dbResult = { warning: "Databricks returned empty response" };
+    } else {
+      try {
+        dbResult = JSON.parse(text);
+      } catch {
+        dbResult = { error: "Databricks returned invalid JSON", raw: text };
+      }
+    }
 
-   return new Response(JSON.stringify(result), {
-     status: 200,
-     headers: { "Content-Type": "application/json" }
-   });
+    if (!response.ok) {
+      return new Response(JSON.stringify(dbResult), {
+        status: response.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  } catch (err) {
+    console.error("Error contacting Databricks:", err);
+    return new Response(
+      JSON.stringify({ error: "Failed to contact Databricks" }),
+      { status: 502, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // --- 5) Return safe result ---
+  return new Response(JSON.stringify(dbResult), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 };
+
