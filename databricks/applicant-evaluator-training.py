@@ -9,6 +9,9 @@
 
 # COMMAND ----------
 
+# Enable Databricks Secrets
+dbutils.library.restartPython()
+
 # pyspark==3.x
 from pyspark.sql import SparkSession, Row, types as T
 import random, datetime
@@ -57,9 +60,76 @@ schema = T.StructType([
     T.StructField("last_updated", T.DateType(), True)
 ])
 
+# Firebase
+from google.oauth2 import service_account
+from google.cloud import firestore
+
+# Pull database API key from Databricks Secret
+service_account_json = dbutils.secrets.get(scope="firebase", key="service_account_json")
+service_account_info = json.loads(service_account_json)
+credentials = service_account.Credentials.from_service_account_info(service_account_info)
+project_id = service_account_info["project_id"]
+fs_client = firestore.Client(project=project_id, credentials=credentials)
+
+# Pull resumes
+COLLECTION_NAME = "resumes"
+docs = fs_client.collection(COLLECTION_NAME).stream()
+
 rows = []
 today = datetime.date.today()
 
+# Resumes pulled from firebase to keep training and improving with new data
+# for doc in docs:
+#     d = doc.to_dict() or {}
+
+#     # Map Firestore fields -> model schema
+#     candidate_id = d.get("candidate_id", doc.id)
+#     full_name = d.get("full_name") or f"{d.get('first_name','')} {d.get('last_name','')}".strip() or doc.id # Will remove for privacy
+#     location = d.get("location")
+#     education_level = d.get("education_level")
+#     years_experience = d.get("years_experience")
+#     skills = d.get("skills") or []
+#     certifications = d.get("certifications") or []
+#     current_title = d.get("current_title")
+#     industries = d.get("industries") or []
+#     achievements = d.get("achievements") or []
+
+#     # Either use a stored competitiveness_score or compute one
+#     if "competitiveness_score" in d:
+#         competitiveness_score = d.get("competitiveness_score")
+#     else:
+#         competitiveness_score = compute_competitiveness(
+#             years_experience,
+#             education_level,
+#             len(skills),
+#             len(certifications),
+#             len(achievements),
+#         )
+
+#     last_updated_raw = d.get("last_updated")
+#     if isinstance(last_updated_raw, datetime.date):
+#         last_updated = last_updated_raw
+#     elif hasattr(last_updated_raw, "date"):  # Firestore Timestamp -> .date()
+#         last_updated = last_updated_raw.date()
+#     else:
+#         last_updated = today
+
+#     rows.append(Row(
+#         candidate_id=candidate_id,
+#         full_name=full_name,
+#         location=location,
+#         education_level=education_level,
+#         years_experience=years_experience,
+#         skills=skills,
+#         certifications=certifications,
+#         current_title=current_title,
+#         industries=industries,
+#         achievements=achievements,
+#         competitiveness_score=competitiveness_score,
+#         last_updated=last_updated
+#     ))
+
+# Randomly Generated Resumes
 for i in range(25):
     fn, ln = random.choice(first_names), random.choice(last_names)
     edu = random.choice(education_levels)

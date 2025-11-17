@@ -11,7 +11,7 @@
 
 # pyspark==3.x
 from pyspark.sql import Row, types as T
-import random, datetime
+import random, json, datetime
 
 random.seed(42)
 
@@ -63,9 +63,88 @@ schema = T.StructType([
     T.StructField("competitiveness_score", T.IntegerType(), True)
 ])
 
+# Firebase
+from google.oauth2 import service_account
+from google.cloud import firestore
+
+# Pull from Databricks Secret
+service_account_json = dbutils.secrets.get(scope="firebase", key="service_account_json")
+service_account_info = json.loads(service_account_json)
+credentials = service_account.Credentials.from_service_account_info(service_account_info)
+project_id = service_account_info["project_id"]
+fs_client = firestore.Client(project=project_id, credentials=credentials)
+
 rows = []
 today = datetime.date.today()
 
+# Pull listings
+COLLECTION_NAME = "job_listings"
+docs = fs_client.collection(COLLECTION_NAME).stream()
+
+# Pull job listings from database
+
+for doc in docs:
+    d = doc.to_dict() or {}
+
+    job_id        = d.get("job_id", doc.id)
+    title         = d.get("title")
+    company       = d.get("company")
+    location      = d.get("location")
+    description   = d.get("description")
+    requirements  = d.get("requirements") or []
+    skills_needed = d.get("skills_needed") or d.get("skills") or []
+    industry      = d.get("industry")
+
+    # 🔥 If you want Firestore job listings to ALSO have a competitiveness score:
+    competitiveness = d.get("competitiveness_score")
+
+    posted_raw = d.get("posted_date")
+    if hasattr(posted_raw, "date"):
+        posted_date = posted_raw.date()
+    else:
+        posted_date = today
+
+    rows.append(Row(
+        job_id=job_id,
+        title=title,
+        company=company,
+        location=location,
+        description=description,
+        requirements=requirements,
+        skills_needed=skills_needed,
+        industry=industry,
+        posted_date=posted_date,
+        competitiveness_score=competitiveness
+    ))
+
+# Create Spark dataframe to split data and process in parallel
+df = spark.createDataFrame(rows)
+
+from pyspark.sql import functions as F
+# Sort by competitiveness_score and pull top 1000 to be filtered by user
+df_top1000 = (
+    df
+    .orderBy(F.desc("competitiveness_score"))
+    .limit(1000)
+)
+
+print("Top 1000 selected:")
+df_top1000.show(20, truncate=False)
+
+spark.sql("CREATE DATABASE IF NOT EXISTS db")
+spark.sql("USE db")
+spark.sql("DROP TABLE IF EXISTS db.job_listings_ranked")
+
+df_top1000.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .saveAsTable("job_listings_ranked")
+
+print("Saved top 1000 job listings ranked by competitiveness_score.")
+
+
+
+# Randomized job listings for training
 for i in range(25):
     title = random.choice(job_titles)
     company = random.choice(companies)
