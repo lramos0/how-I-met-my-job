@@ -1,307 +1,386 @@
-import streamlit as st
-import pandas as pd
-import fitz  # PyMuPDF for PDF
-import docx2txt  # for DOCX
-import spacy
-from sentence_transformers import SentenceTransformer, util
-import numpy as np
-import matplotlib.pyplot as plt
-import json
-import re
-import uuid
-import os
+# import streamlit as st
+# import pandas as pd
+# import fitz  # PyMuPDF for PDF
+# import docx2txt  # for DOCX
+# import spacy
+# from sentence_transformers import SentenceTransformer, util
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import json
+# import re
+# import uuid
+# import os
 
-# =========================
-# PAGE CONFIG
-# =========================
-st.set_page_config(page_title="How I Met My JOB", layout="wide")
+# # =========================
+# # PAGE CONFIG
+# # =========================
+# st.set_page_config(page_title="How I Met My JOB", layout="wide")
 
-# =========================
-# HELPER FUNCTIONS
-# =========================
-def extract_text_from_pdf(uploaded_file):
-    """Extracts text from a PDF file uploaded via Streamlit."""
-    text = ""
-    try:
-        pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        for page_num in range(pdf_document.page_count):
-            page = pdf_document.load_page(page_num)
-            text += page.get_text("text")
-        pdf_document.close()
-    except Exception as e:
-        st.error(f"❌ Error reading PDF: {e}")
-    return text
-
-
-def extract_text_from_docx(uploaded_file):
-    """Extracts text from a DOCX file uploaded via Streamlit."""
-    try:
-        return docx2txt.process(uploaded_file)
-    except Exception as e:
-        st.error(f"❌ Error reading DOCX: {e}")
-        return ""
+# # =========================
+# # HELPER FUNCTIONS
+# # =========================
+# def extract_text_from_pdf(uploaded_file):
+#     """Extracts text from a PDF file uploaded via Streamlit."""
+#     text = ""
+#     try:
+#         pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+#         for page_num in range(pdf_document.page_count):
+#             page = pdf_document.load_page(page_num)
+#             text += page.get_text("text")
+#         pdf_document.close()
+#     except Exception as e:
+#         st.error(f"❌ Error reading PDF: {e}")
+#     return text
 
 
-def compute_similarity(resume_text, df, model, skill_patterns):
-    """Compute similarity score between resume and job descriptions."""
-    # ✅ include job_summary since that's your text column
-    possible_cols = ["job_summary", "job_description", "description", "summary", "details"]
-    text_col = next((c for c in possible_cols if c in df.columns), None)
-    if not text_col:
-        st.error(f"❌ Could not find a column containing job descriptions. Found: {list(df.columns)}")
-        st.stop()
-
-    st.info(f"Using **{text_col}** as the job description column.")
-    resume_emb = model.encode(resume_text, convert_to_tensor=True)
-    job_embeddings = model.encode(df[text_col].astype(str).tolist(), convert_to_tensor=True)
-    similarities = util.cos_sim(resume_emb, job_embeddings)[0].cpu().numpy()
-    return similarities
+# def extract_text_from_docx(uploaded_file):
+#     """Extracts text from a DOCX file uploaded via Streamlit."""
+#     try:
+#         return docx2txt.process(uploaded_file)
+#     except Exception as e:
+#         st.error(f"❌ Error reading DOCX: {e}")
+#         return ""
 
 
-# =========================
-# LOAD MODELS AND DATA
-# =========================
-@st.cache_data
-def load_job_data():
-    path = r"C:\Users\takbh\OneDrive\Desktop\BDA696\project\how-I-met-my-job\webui\data\job_postings.csv"
-    df = pd.read_csv(path)
-    df.columns = df.columns.str.lower().str.strip()
+# def compute_similarity(resume_text, df, model, skill_patterns):
+#     """Compute similarity score between resume and job descriptions."""
+#     # ✅ include job_summary since that's your text column
+#     possible_cols = ["job_summary", "job_description", "description", "summary", "details"]
+#     text_col = next((c for c in possible_cols if c in df.columns), None)
+#     if not text_col:
+#         st.error(f"❌ Could not find a column containing job descriptions. Found: {list(df.columns)}")
+#         st.stop()
 
-    # Optional: rename for consistency
-    df.rename(columns={
-        'company': 'company_name',
-        'title': 'job_title',
-        'location': 'job_location'
-    }, inplace=True)
-
-    return df
+#     st.info(f"Using **{text_col}** as the job description column.")
+#     resume_emb = model.encode(resume_text, convert_to_tensor=True)
+#     job_embeddings = model.encode(df[text_col].astype(str).tolist(), convert_to_tensor=True)
+#     similarities = util.cos_sim(resume_emb, job_embeddings)[0].cpu().numpy()
+#     return similarities
 
 
-@st.cache_resource
-def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+# # =========================
+# # LOAD MODELS AND DATA
+# # =========================
+# @st.cache_data
+# def load_job_data():
+#     path = r"C:\Users\takbh\OneDrive\Desktop\BDA696\project\how-I-met-my-job\webui\data\job_postings.csv"
+#     df = pd.read_csv(path)
+#     df.columns = df.columns.str.lower().str.strip()
+
+#     # Optional: rename for consistency
+#     df.rename(columns={
+#         'company': 'company_name',
+#         'title': 'job_title',
+#         'location': 'job_location'
+#     }, inplace=True)
+
+#     return df
 
 
-df = load_job_data()
-model = load_model()
-nlp = spacy.load("en_core_web_sm")
+# @st.cache_resource
+# def load_model():
+#     return SentenceTransformer("all-MiniLM-L6-v2")
 
-# Dummy skill patterns
-SKILL_PATTERNS = ["Python", "SQL", "Machine Learning", "Data Analysis", "Tableau", "Excel"]
 
-# =========================
-# SESSION STATE
-# =========================
-if "resume_uploaded" not in st.session_state:
-    st.session_state.resume_uploaded = False
-if "resume_text" not in st.session_state:
-    st.session_state.resume_text = ""
+# df = load_job_data()
+# model = load_model()
+# nlp = spacy.load("en_core_web_sm")
 
-# =========================
-# PAGE 1: Upload Resume
-# =========================
-if not st.session_state.resume_uploaded:
-    st.title("📄 Upload Your Resume")
-    st.markdown("Upload your resume (PDF or DOCX) to start personalized job matching!")
+# # Dummy skill patterns
+# SKILL_PATTERNS = ["Python", "SQL", "Machine Learning", "Data Analysis", "Tableau", "Excel"]
 
-    uploaded_file = st.file_uploader("Choose your resume", type=["pdf", "docx"])
+# # =========================
+# # SESSION STATE
+# # =========================
+# if "resume_uploaded" not in st.session_state:
+#     st.session_state.resume_uploaded = False
+# if "resume_text" not in st.session_state:
+#     st.session_state.resume_text = ""
 
-    if uploaded_file:
-        with st.spinner("Reading and analyzing your resume..."):
-            if uploaded_file.name.endswith(".pdf"):
-                resume_text = extract_text_from_pdf(uploaded_file)
-            else:
-                resume_text = extract_text_from_docx(uploaded_file)
+# # =========================
+# # PAGE 1: Upload Resume
+# # =========================
+# if not st.session_state.resume_uploaded:
+#     st.title("📄 Upload Your Resume")
+#     st.markdown("Upload your resume (PDF or DOCX) to start personalized job matching!")
 
-            if resume_text.strip():
-                st.session_state.resume_uploaded = True
-                st.session_state.resume_text = resume_text
-                st.success("✅ Resume uploaded successfully!")
-                st.rerun()
-            else:
-                st.error("Could not extract text from your file. Try another one.")
-    st.stop()
-# =========================
-# PAGE 2: Job Matching + Resume Parsing + Filters
-# =========================
+#     uploaded_file = st.file_uploader("Choose your resume", type=["pdf", "docx"])
 
-st.title("🎯 Job Matching Dashboard")
-st.markdown("Refine your job search and explore your best matches based on your parsed resume and job listings.")
+#     if uploaded_file:
+#         with st.spinner("Reading and analyzing your resume..."):
+#             if uploaded_file.name.endswith(".pdf"):
+#                 resume_text = extract_text_from_pdf(uploaded_file)
+#             else:
+#                 resume_text = extract_text_from_docx(uploaded_file)
 
-# =========================================================
-# 🧾 Resume Parsing Functionality
-# =========================================================
-def extract_entities_from_text(text: str) -> dict:
-    """Extract structured info (skills, exp, certifications, achievements) from resume text."""
-    doc = nlp(text)
+#             if resume_text.strip():
+#                 st.session_state.resume_uploaded = True
+#                 st.session_state.resume_text = resume_text
+#                 st.success("✅ Resume uploaded successfully!")
+#                 st.rerun()
+#             else:
+#                 st.error("Could not extract text from your file. Try another one.")
+#     st.stop()
+# # =========================
+# # PAGE 2: Job Matching + Resume Parsing + Filters
+# # =========================
 
-    # Named entities
-    name = next((ent.text for ent in doc.ents if ent.label_ == "PERSON"), "")
-    location = next((ent.text for ent in doc.ents if ent.label_ in ["GPE", "LOC"]), "")
+# st.title("🎯 Job Matching Dashboard")
+# st.markdown("Refine your job search and explore your best matches based on your parsed resume and job listings.")
 
-    # Regex-based extraction
-    email = re.search(r"[\w\.-]+@[\w\.-]+", text)
-    phone = re.search(r"\+?\d[\d\s\-]{8,}\d", text)
-    education = re.findall(r"(Bachelor|Master|B\.Sc|M\.Sc|Ph\.D|MBA)", text, re.I)
-    skills = re.findall(r"(Python|SQL|Excel|Machine Learning|Java|AWS|Power BI|Tableau|Hadoop|Spark|R|Snowflake|TensorFlow|Data Analysis)", text, re.I)
-    certifications = re.findall(r"(Certified|Certificate|Certification|AWS|Azure|Google Cloud|Snowflake|PMP)", text, re.I)
-    achievements = re.findall(r"(award|achievement|recognition|promotion|success|honor)", text, re.I)
-    exp_match = re.search(r"(\d+)\+?\s+years", text)
-    years_experience = float(exp_match.group(1)) if exp_match else 0.0
+# # =========================================================
+# # 🧾 Resume Parsing Functionality
+# # =========================================================
+# def extract_entities_from_text(text: str) -> dict:
+#     """Extract structured info (skills, exp, certifications, achievements) from resume text."""
+#     doc = nlp(text)
 
-    return {
-        "candidate_id": str(uuid.uuid4()),
-        "full_name": name or "Unknown",
-        "location": location or "",
-        "email": email.group(0) if email else "",
-        "phone": phone.group(0) if phone else "",
-        "education_level": education[0] if education else "",
-        "years_experience": years_experience,
-        "skills": list(set(skills)),
-        "certifications": list(set(certifications)),
-        "achievements": list(set(achievements))
-    }
+#     # Named entities
+#     name = next((ent.text for ent in doc.ents if ent.label_ == "PERSON"), "")
+#     location = next((ent.text for ent in doc.ents if ent.label_ in ["GPE", "LOC"]), "")
 
-# Run parser on uploaded resume text
-resume_text = st.session_state.resume_text
-parsed_data = extract_entities_from_text(resume_text)
+#     # Regex-based extraction
+#     email = re.search(r"[\w\.-]+@[\w\.-]+", text)
+#     phone = re.search(r"\+?\d[\d\s\-]{8,}\d", text)
+#     education = re.findall(r"(Bachelor|Master|B\.Sc|M\.Sc|Ph\.D|MBA)", text, re.I)
+#     skills = re.findall(r"(Python|SQL|Excel|Machine Learning|Java|AWS|Power BI|Tableau|Hadoop|Spark|R|Snowflake|TensorFlow|Data Analysis)", text, re.I)
+#     certifications = re.findall(r"(Certified|Certificate|Certification|AWS|Azure|Google Cloud|Snowflake|PMP)", text, re.I)
+#     achievements = re.findall(r"(award|achievement|recognition|promotion|success|honor)", text, re.I)
+#     exp_match = re.search(r"(\d+)\+?\s+years", text)
+#     years_experience = float(exp_match.group(1)) if exp_match else 0.0
 
-# Save parsed JSON in project folder
-output_dir = r"C:\Users\takbh\OneDrive\Desktop\BDA696\project\how-I-met-my-job\webui"
-os.makedirs(output_dir, exist_ok=True)
-output_file = os.path.join(output_dir, "parsed_resume.json")
-with open(output_file, "w", encoding="utf-8") as f:
-    json.dump(parsed_data, f, indent=4)
+#     return {
+#         "candidate_id": str(uuid.uuid4()),
+#         "full_name": name or "Unknown",
+#         "location": location or "",
+#         "email": email.group(0) if email else "",
+#         "phone": phone.group(0) if phone else "",
+#         "education_level": education[0] if education else "",
+#         "years_experience": years_experience,
+#         "skills": list(set(skills)),
+#         "certifications": list(set(certifications)),
+#         "achievements": list(set(achievements))
+#     }
 
-# =========================================================
-# 🧾 Display Parsed Resume Summary
-# =========================================================
-st.markdown("---")
-st.subheader("🧾 Resume Summary")
+# # Run parser on uploaded resume text
+# resume_text = st.session_state.resume_text
+# parsed_data = extract_entities_from_text(resume_text)
 
-col1, col2 = st.columns(2)
-with col1:
-    ##st.markdown(f"**👤 Name:** {parsed_data['full_name']}")
-    ##st.markdown(f"**📍 Location:** {parsed_data['location'] or 'N/A'}")
-    st.markdown(f"**📧 Email:** {parsed_data['email'] or 'N/A'}")
-    ##st.markdown(f"**📞 Phone:** {parsed_data['phone'] or 'N/A'}")
-with col2:
-    st.markdown(f"**🎓 Education:** {parsed_data['education_level'] or 'N/A'}")
-    st.markdown(f"**💼 Experience:** {parsed_data['years_experience']} years")
+# # Save parsed JSON in project folder
+# output_dir = r"C:\Users\takbh\OneDrive\Desktop\BDA696\project\how-I-met-my-job\webui"
+# os.makedirs(output_dir, exist_ok=True)
+# output_file = os.path.join(output_dir, "parsed_resume.json")
+# with open(output_file, "w", encoding="utf-8") as f:
+#     json.dump(parsed_data, f, indent=4)
 
-st.markdown("### 🛠️ Skills")
-if parsed_data["skills"]:
-    st.success(", ".join(parsed_data["skills"]))
-else:
-    st.info("No skills detected.")
+# # =========================================================
+# # 🧾 Display Parsed Resume Summary
+# # =========================================================
+# st.markdown("---")
+# st.subheader("🧾 Resume Summary")
 
-st.markdown("### 🏅 Certifications")
-if parsed_data["certifications"]:
-    st.success(", ".join(parsed_data["certifications"]))
-else:
-    st.info("No certifications detected.")
+# col1, col2 = st.columns(2)
+# with col1:
+#     ##st.markdown(f"**👤 Name:** {parsed_data['full_name']}")
+#     ##st.markdown(f"**📍 Location:** {parsed_data['location'] or 'N/A'}")
+#     st.markdown(f"**📧 Email:** {parsed_data['email'] or 'N/A'}")
+#     ##st.markdown(f"**📞 Phone:** {parsed_data['phone'] or 'N/A'}")
+# with col2:
+#     st.markdown(f"**🎓 Education:** {parsed_data['education_level'] or 'N/A'}")
+#     st.markdown(f"**💼 Experience:** {parsed_data['years_experience']} years")
 
-st.markdown("### 🌟 Achievements")
-if parsed_data["achievements"]:
-    st.success(", ".join(parsed_data["achievements"]))
-else:
-    st.info("No achievements detected.")
+# st.markdown("### 🛠️ Skills")
+# if parsed_data["skills"]:
+#     st.success(", ".join(parsed_data["skills"]))
+# else:
+#     st.info("No skills detected.")
 
-st.markdown("---")
+# st.markdown("### 🏅 Certifications")
+# if parsed_data["certifications"]:
+#     st.success(", ".join(parsed_data["certifications"]))
+# else:
+#     st.info("No certifications detected.")
 
-# =========================================================
-# 📋 Job Filters
-# =========================================================
-st.sidebar.header("📋 Filter Job Listings")
+# st.markdown("### 🌟 Achievements")
+# if parsed_data["achievements"]:
+#     st.success(", ".join(parsed_data["achievements"]))
+# else:
+#     st.info("No achievements detected.")
 
-company = st.sidebar.selectbox("Company", ["All"] + sorted(df["company_name"].dropna().unique()), key="filter_company")
-title = st.sidebar.selectbox("Job Title", ["All"] + sorted(df["job_title"].dropna().unique()), key="filter_title")
-location = st.sidebar.selectbox("Job Location", ["All"] + sorted(df["job_location"].dropna().unique()), key="filter_location")
-country = st.sidebar.selectbox("Country Code", ["All"] + sorted(df["country_code"].dropna().unique()), key="filter_country")
-seniority = st.sidebar.selectbox("Seniority Level", ["All"] + sorted(df["job_seniority_level"].dropna().unique()), key="filter_seniority")
-employment_type = st.sidebar.selectbox("Employment Type", ["All"] + sorted(df["job_employment_type"].dropna().unique()), key="filter_employment")
-industry = st.sidebar.selectbox("Industry", ["All"] + sorted(df["job_industries"].dropna().unique()), key="filter_industry")
-salary_range = st.sidebar.text_input("Base Pay Range (e.g. 50000-100000)", key="filter_salary")
-date_range = st.sidebar.date_input("Posted Date Range", [], key="filter_daterange")
+# st.markdown("---")
 
-# Apply filters
-filtered_df = df.copy()
-if company != "All":
-    filtered_df = filtered_df[filtered_df["company_name"] == company]
-if title != "All":
-    filtered_df = filtered_df[filtered_df["job_title"] == title]
-if location != "All":
-    filtered_df = filtered_df[filtered_df["job_location"] == location]
-if country != "All":
-    filtered_df = filtered_df[filtered_df["country_code"] == country]
-if seniority != "All":
-    filtered_df = filtered_df[filtered_df["job_seniority_level"] == seniority]
-if employment_type != "All":
-    filtered_df = filtered_df[filtered_df["job_employment_type"] == employment_type]
-if industry != "All":
-    filtered_df = filtered_df[filtered_df["job_industries"] == industry]
+# # =========================================================
+# # 📋 Job Filters
+# # =========================================================
+# st.sidebar.header("📋 Filter Job Listings")
 
-if salary_range:
-    try:
-        min_salary, max_salary = map(int, salary_range.split("-"))
-        filtered_df = filtered_df[
-            filtered_df["job_base_pay_range"].apply(
-                lambda x: isinstance(x, str)
-                and any(char.isdigit() for char in x)
-                and min_salary <= int("".join(filter(str.isdigit, x))) <= max_salary
-            )
-        ]
-    except:
-        st.warning("Invalid salary range format. Use format like 50000-100000.")
+# company = st.sidebar.selectbox("Company", ["All"] + sorted(df["company_name"].dropna().unique()), key="filter_company")
+# title = st.sidebar.selectbox("Job Title", ["All"] + sorted(df["job_title"].dropna().unique()), key="filter_title")
+# location = st.sidebar.selectbox("Job Location", ["All"] + sorted(df["job_location"].dropna().unique()), key="filter_location")
+# country = st.sidebar.selectbox("Country Code", ["All"] + sorted(df["country_code"].dropna().unique()), key="filter_country")
+# seniority = st.sidebar.selectbox("Seniority Level", ["All"] + sorted(df["job_seniority_level"].dropna().unique()), key="filter_seniority")
+# employment_type = st.sidebar.selectbox("Employment Type", ["All"] + sorted(df["job_employment_type"].dropna().unique()), key="filter_employment")
+# industry = st.sidebar.selectbox("Industry", ["All"] + sorted(df["job_industries"].dropna().unique()), key="filter_industry")
+# salary_range = st.sidebar.text_input("Base Pay Range (e.g. 50000-100000)", key="filter_salary")
+# date_range = st.sidebar.date_input("Posted Date Range", [], key="filter_daterange")
 
-if date_range:
-    try:
-        filtered_df["job_posted_date"] = pd.to_datetime(filtered_df["job_posted_date"], errors="coerce")
-        if len(date_range) == 2:
-            start_date, end_date = date_range
-            filtered_df = filtered_df[
-                (filtered_df["job_posted_date"] >= pd.to_datetime(start_date))
-                & (filtered_df["job_posted_date"] <= pd.to_datetime(end_date))
-            ]
-    except:
-        st.warning("Invalid date format in job_posted_date column.")
+# # Apply filters
+# filtered_df = df.copy()
+# if company != "All":
+#     filtered_df = filtered_df[filtered_df["company_name"] == company]
+# if title != "All":
+#     filtered_df = filtered_df[filtered_df["job_title"] == title]
+# if location != "All":
+#     filtered_df = filtered_df[filtered_df["job_location"] == location]
+# if country != "All":
+#     filtered_df = filtered_df[filtered_df["country_code"] == country]
+# if seniority != "All":
+#     filtered_df = filtered_df[filtered_df["job_seniority_level"] == seniority]
+# if employment_type != "All":
+#     filtered_df = filtered_df[filtered_df["job_employment_type"] == employment_type]
+# if industry != "All":
+#     filtered_df = filtered_df[filtered_df["job_industries"] == industry]
 
-# =========================================================
-# 🔍 Compute Similarity with Resume
-# =========================================================
-st.subheader("📊 Job Matching Results")
+# if salary_range:
+#     try:
+#         min_salary, max_salary = map(int, salary_range.split("-"))
+#         filtered_df = filtered_df[
+#             filtered_df["job_base_pay_range"].apply(
+#                 lambda x: isinstance(x, str)
+#                 and any(char.isdigit() for char in x)
+#                 and min_salary <= int("".join(filter(str.isdigit, x))) <= max_salary
+#             )
+#         ]
+#     except:
+#         st.warning("Invalid salary range format. Use format like 50000-100000.")
 
-with st.spinner("Analyzing job descriptions and computing similarity..."):
-    # Ensure the right column is used
-    if "job_summary" not in filtered_df.columns:
-        st.error("❌ Could not find 'job_summary' column in job data.")
-        st.stop()
+# if date_range:
+#     try:
+#         filtered_df["job_posted_date"] = pd.to_datetime(filtered_df["job_posted_date"], errors="coerce")
+#         if len(date_range) == 2:
+#             start_date, end_date = date_range
+#             filtered_df = filtered_df[
+#                 (filtered_df["job_posted_date"] >= pd.to_datetime(start_date))
+#                 & (filtered_df["job_posted_date"] <= pd.to_datetime(end_date))
+#             ]
+#     except:
+#         st.warning("Invalid date format in job_posted_date column.")
 
-    resume_emb = model.encode(resume_text, convert_to_tensor=True)
-    job_embeddings = model.encode(filtered_df["job_summary"].astype(str).tolist(), convert_to_tensor=True)
-    similarities = util.cos_sim(resume_emb, job_embeddings)[0].cpu().numpy()
-    filtered_df["match_score"] = similarities
+# # =========================================================
+# # 🔍 Compute Similarity with Resume
+# # =========================================================
+# st.subheader("📊 Job Matching Results")
 
-# Sort by match score
-top_matches = filtered_df.sort_values("match_score", ascending=False).head(10)
+# with st.spinner("Analyzing job descriptions and computing similarity..."):
+#     # Ensure the right column is used
+#     if "job_summary" not in filtered_df.columns:
+#         st.error("❌ Could not find 'job_summary' column in job data.")
+#         st.stop()
 
-# Display top results
-for _, job in top_matches.iterrows():
-    st.markdown(
-        f"**{job['job_title']}** at *{job['company_name']}* — "
-        f"📍 {job.get('job_location', 'N/A')} — 🧠 Match Score: **{job['match_score']:.0%}**"
-    )
+#     resume_emb = model.encode(resume_text, convert_to_tensor=True)
+#     job_embeddings = model.encode(filtered_df["job_summary"].astype(str).tolist(), convert_to_tensor=True)
+#     similarities = util.cos_sim(resume_emb, job_embeddings)[0].cpu().numpy()
+#     filtered_df["match_score"] = similarities
 
-# Visualization
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.barh(top_matches["job_title"], top_matches["match_score"])
-ax.set_xlabel("Match Score")
-ax.set_ylabel("Job Title")
-ax.set_title("Top Matching Jobs")
-st.pyplot(fig)
+# # Sort by match score
+# top_matches = filtered_df.sort_values("match_score", ascending=False).head(10)
 
-# Back button
-if st.button("⬅️ Upload another resume"):
-    st.session_state.resume_uploaded = False
-    st.session_state.resume_text = ""
-    st.rerun()
+# # Display top results
+# for _, job in top_matches.iterrows():
+#     st.markdown(
+#         f"**{job['job_title']}** at *{job['company_name']}* — "
+#         f"📍 {job.get('job_location', 'N/A')} — 🧠 Match Score: **{job['match_score']:.0%}**"
+#     )
+
+# # Visualization
+# fig, ax = plt.subplots(figsize=(8, 4))
+# ax.barh(top_matches["job_title"], top_matches["match_score"])
+# ax.set_xlabel("Match Score")
+# ax.set_ylabel("Job Title")
+# ax.set_title("Top Matching Jobs")
+# st.pyplot(fig)
+
+# # Back button
+# if st.button("⬅️ Upload another resume"):
+#     st.session_state.resume_uploaded = False
+#     st.session_state.resume_text = ""
+#     st.rerun()
+
+# # web/app.py
+
+# # import os
+# # import sys
+
+# # # --- Make sure Python can see web/src ---
+# # CURRENT_DIR = os.path.dirname(__file__)          # .../web/webui
+# # WEB_DIR = os.path.dirname(CURRENT_DIR)           # .../web
+# # SRC_DIR = os.path.join(WEB_DIR, "src")           # .../web/src
+
+# # if SRC_DIR not in sys.path:
+# #     sys.path.insert(0, SRC_DIR)
+
+# # from flask import Flask, request, jsonify
+# # from cv.parsing.cvparsing import parse_cv
+
+# # # Serve static files from webui/cvdashboard
+# # app = Flask(
+# #     __name__,
+# #     static_folder="cvdashboard",
+# #     static_url_path="",
+# # )
+
+
+# # # ---------- Static pages (frontend) ----------
+
+# # @app.route("/")
+# # def index():
+# #     # Serves web/webui/cvdashboard/index.html
+# #     return app.send_static_file("index.html")
+
+
+# # @app.route("/<path:path>")
+# # def static_proxy(path):
+# #     """
+# #     Allow direct access to jobs.html, JS, CSS, etc.
+# #     e.g., /jobs.html, /script.js, /style.css
+# #     """
+# #     return app.send_static_file(path)
+
+
+# # # ---------- API endpoint: parse resume ----------
+
+# # @app.post("/parse-resume")
+# # def parse_resume_endpoint():
+# #     """
+# #     Accept a resume file (PDF/DOCX), parse it with parse_cv(),
+# #     and return JSON that the frontend can render immediately.
+# #     """
+# #     if "file" not in request.files:
+# #         return jsonify({"error": "No file uploaded"}), 400
+
+# #     upload = request.files["file"]
+# #     if not upload.filename:
+# #         return jsonify({"error": "Empty filename"}), 400
+
+# #     # Save to temporary file so parse_cv can read from disk
+# #     suffix = os.path.splitext(upload.filename)[1]
+# #     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+# #         upload.save(tmp.name)
+# #         tmp_path = tmp.name
+
+# #     try:
+# #         parsed = parse_cv(tmp_path)
+# #     except Exception as e:
+# #         return jsonify({"error": f"Failed to parse resume: {e}"}), 500
+# #     finally:
+# #         try:
+# #             os.remove(tmp_path)
+# #         except OSError:
+# #             pass
+
+# #     return jsonify(parsed)
+
+
+# # if __name__ == "__main__":
+# #     # Run the dev server: http://127.0.0.1:5000/
+# #     app.run(debug=True)
