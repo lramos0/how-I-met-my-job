@@ -37,7 +37,6 @@
     <script>
         let resumeJSON = null;
 
-        // Simulated parsing (replace this with actual backend or JS NLP later)
         async function parseResume() {
             const fileInput = document.getElementById("resumeFile");
             const status = document.getElementById("statusMsg");
@@ -48,35 +47,43 @@
             }
 
             const file = fileInput.files[0];
-            status.textContent = `Reading ${file.name} ...`;
+            status.textContent = `Uploading ${file.name}...`;
 
-            // Simulated parsing delay
-            await new Promise(r => setTimeout(r, 1000));
+            const form = new FormData();
+            form.append('resume', file, file.name);
 
-            // Mock parsed data (replace with real logic)
-            resumeJSON = {
-                name: "Uma Takbhate",
-                email: "umatakbhate@example.com",
-                phone: "+1 555-123-4567",
-                education: "M.S. in Business Analytics, SDSU",
-                experience: "2 years as Data Analyst at ABC Corp",
-                skills: ["Python", "Machine Learning", "SQL", "Power BI", "Streamlit"],
-                certifications: ["Google Data Analytics", "AWS Practitioner"]
-            };
+            try {
+                const resp = await fetch('/api/parse', {
+                    method: 'POST',
+                    body: form
+                });
 
-            // Update UI
-            status.textContent = "✅ Resume parsed successfully!";
-            document.getElementById("parsedOutput").innerHTML = `
-        <b>Name:</b> ${resumeJSON.name}<br>
-        <b>Email:</b> ${resumeJSON.email}<br>
-        <b>Phone:</b> ${resumeJSON.phone}<br>
-        <b>Education:</b> ${resumeJSON.education}<br>
-        <b>Experience:</b> ${resumeJSON.experience}<br>
-        <b>Skills:</b> ${resumeJSON.skills.join(", ")}<br>
-        <b>Certifications:</b> ${resumeJSON.certifications.join(", ")}
-      `;
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    status.textContent = `⚠️ Error: ${err.error || resp.statusText}`;
+                    return;
+                }
 
-            document.getElementById("previewSection").classList.remove("d-none");
+                const data = await resp.json();
+                resumeJSON = data;
+
+                // Update UI
+                status.textContent = "✅ Resume parsed successfully!";
+                document.getElementById("parsedOutput").innerHTML = `
+          <b>Name:</b> ${resumeJSON.name || ''}<br>
+          <b>Email:</b> ${resumeJSON.email || ''}<br>
+          <b>Phone:</b> ${resumeJSON.phone || ''}<br>
+          <b>Education:</b> ${resumeJSON.education || ''}<br>
+          <b>Experience:</b> ${resumeJSON.experience || ''}<br>
+          <b>Skills:</b> ${(resumeJSON.skills || []).join(", ")}<br>
+          <b>Certifications:</b> ${(resumeJSON.certifications || []).join(", ")}
+        `;
+
+                document.getElementById("previewSection").classList.remove("d-none");
+            } catch (e) {
+                console.error(e);
+                status.textContent = '⚠️ Failed to parse resume (network or server error).';
+            }
         }
 
         function downloadJSON() {
