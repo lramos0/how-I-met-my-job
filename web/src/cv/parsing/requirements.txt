@@ -1,0 +1,5 @@
+flask
+flask-cors
+spacy
+PyMuPDF
+docx2txt
