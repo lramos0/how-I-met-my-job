@@ -6,3 +6,5 @@ generate_sample_resume.py
 __pycache__/
 *.csv
 .csv
+requirements.txt
+app.py
