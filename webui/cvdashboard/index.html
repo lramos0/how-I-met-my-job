@@ -224,8 +224,96 @@
         }
 
         function extractSkills(text) {
-            const skills = ["python", "java", "javascript", "spark", "tensorflow", "aws", "docker"];
-            return skills.filter(s => text.toLowerCase().includes(s));
+            // Expanded skill dictionary (canonical -> aliases)
+            const skill_dict = {
+                "python": ["python", "python3", "cpython", "pypy"],
+                "java": ["java", "openjdk", "jdk", "jvm"],
+                "javascript": ["javascript", "js", "nodejs", "ecmascript"],
+                "typescript": ["typescript", "ts"],
+                "go": ["go", "golang"],
+                "c": ["c"],
+                "c++": ["c++", "cpp"],
+                "c#": ["c#", "csharp"],
+                "ruby": ["ruby", "ruby on rails", "rails"],
+                "php": ["php", "laravel", "symfony"],
+                "rust": ["rust"],
+                "kotlin": ["kotlin"],
+                "scala": ["scala"],
+                "r": ["r", "r language"],
+                "swift": ["swift"],
+                "shell": ["shell", "bash", "zsh", "sh"],
+                "perl": ["perl"],
+                "sql": ["sql", "mysql", "postgresql", "oracle", "sqlite", "mssql"],
+                "nosql": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
+                "big data": ["big data", "hadoop", "spark", "mapreduce", "hive", "pig"],
+                "data engineering": ["data engineering", "etl", "data pipeline", "airflow"],
+                "data science": ["data science", "machine learning", "ml", "statistics"],
+                "deep learning": ["deep learning", "neural networks", "tensorflow", "pytorch", "keras"],
+                "mlops": ["mlops", "model deployment", "model serving", "sagemaker", "mlflow"],
+                "nlp": ["nlp", "natural language processing", "transformers", "spacy", "nltk"],
+                "computer vision": ["computer vision", "cv", "opencv"],
+                "analytics": ["analytics", "business intelligence", "bi", "tableau", "power bi"],
+                "rest": ["rest", "restful api", "api", "web api"],
+                "graphql": ["graphql"],
+                "web frameworks": ["django", "flask", "express", "spring", "rails", "fastapi"],
+                "frontend frameworks": ["react", "angular", "vue", "svelte", "ember"],
+                "html": ["html", "html5"],
+                "css": ["css", "css3", "scss", "sass", "less"],
+                "webpack": ["webpack", "rollup", "parcel"],
+                "microservices": ["microservices", "service oriented architecture", "soa"],
+                "devops": ["devops", "ci/cd", "continuous integration", "continuous delivery", "continuous deployment"],
+                "docker": ["docker", "containers"],
+                "kubernetes": ["kubernetes", "k8s", "kube"],
+                "terraform": ["terraform"],
+                "ansible": ["ansible"],
+                "chef": ["chef"],
+                "puppet": ["puppet"],
+                "helm": ["helm"],
+                "istio": ["istio", "service mesh"],
+                "prometheus": ["prometheus", "grafana", "monitoring"],
+                "logging": ["elk", "elasticsearch", "logstash", "kibana", "splunk"],
+                "cloud aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "cloudformation", "iam", "dynamodb"],
+                "cloud azure": ["azure", "microsoft azure", "azure functions", "azure devops", "arm templates"],
+                "cloud gcp": ["gcp", "google cloud", "google cloud platform", "gce", "bigquery", "cloud functions"],
+                "openstack": ["openstack"],
+                "serverless": ["serverless", "faas"],
+                "edge computing": ["edge computing"],
+                "networking": ["networking", "dns", "http", "tcp/ip"],
+                "security": ["security", "kubernetes security", "oauth2", "jwt", "tls", "ssl", "vault"],
+                "git": ["git", "gitlab", "github", "bitbucket"],
+                "ci tools": ["jenkins", "circleci", "travis ci", "github actions", "gitlab ci", "azure pipelines"],
+                "jira": ["jira", "confluence"],
+                "slack": ["slack"],
+                "docker-compose": ["docker-compose", "compose"],
+                "testing": ["testing", "unit test", "integration test", "pytest", "junit", "mocha", "jest"],
+                "performance": ["performance", "profiling", "benchmark"],
+                "cache": ["cache", "redis", "memcached"],
+                "microservices architecture": ["microservices architecture", "soa", "service mesh"],
+                "design patterns": ["design patterns", "solid", "ddd", "clean architecture"],
+                "architecture": ["architecture", "system design", "scalability", "high availability"],
+                "agile": ["agile", "scrum", "kanban"],
+                "devsecops": ["devsecops", "security as code", "shift left"],
+                "observability": ["observability", "opentelemetry", "logging", "tracing", "metrics"]
+            };
+
+            const lower = text.toLowerCase();
+            const found = [];
+
+            // Iterate canonical skills and check aliases (short-circuit on first alias match)
+            for (const canonical in skill_dict) {
+                const aliases = skill_dict[canonical];
+                for (let i = 0; i < aliases.length; i++) {
+                    const a = aliases[i];
+                    if (!a) continue;
+                    if (lower.indexOf(a) !== -1) {
+                        found.push(canonical);
+                        break;
+                    }
+                }
+            }
+
+            // Remove duplicates and return
+            return Array.from(new Set(found));
         }
 
         function extractCerts(text) {
@@ -238,7 +326,7 @@
         function extractTitle(text) {
             const roles = [
                 "Software Engineer", "ML Engineer", "Data Scientist", "Developer",
-                "Teacher", "Counselor", "Supervisor", "Specialist"
+                "Teacher", "Counselor", "Supervisor", "Specialist", "Consultant", "Manager", "Data Analyst", "Business Analyst"
             ];
             for (let r of roles) {
                 const regex = new RegExp(r, "i");

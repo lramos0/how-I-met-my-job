@@ -53,6 +53,104 @@ async function loadResume() {
                 resume.skills = [];
             }
         }
+        // Normalize skills to canonical names using the same skill dictionary as the parser
+        const skill_dict = {
+            "python": ["python", "python3", "cpython", "pypy"],
+            "java": ["java", "openjdk", "jdk", "jvm"],
+            "javascript": ["javascript", "js", "nodejs", "ecmascript"],
+            "typescript": ["typescript", "ts"],
+            "go": ["go", "golang"],
+            "c": ["c"],
+            "c++": ["c++", "cpp"],
+            "c#": ["c#", "csharp"],
+            "ruby": ["ruby", "ruby on rails", "rails"],
+            "php": ["php", "laravel", "symfony"],
+            "rust": ["rust"],
+            "kotlin": ["kotlin"],
+            "scala": ["scala"],
+            "r": ["r", "r language"],
+            "swift": ["swift"],
+            "shell": ["shell", "bash", "zsh", "sh"],
+            "perl": ["perl"],
+            "sql": ["sql", "mysql", "postgresql", "oracle", "sqlite", "mssql"],
+            "nosql": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
+            "big data": ["big data", "hadoop", "spark", "mapreduce", "hive", "pig"],
+            "data engineering": ["data engineering", "etl", "data pipeline", "airflow"],
+            "data science": ["data science", "machine learning", "ml", "statistics"],
+            "deep learning": ["deep learning", "neural networks", "tensorflow", "pytorch", "keras"],
+            "mlops": ["mlops", "model deployment", "model serving", "sagemaker", "mlflow"],
+            "nlp": ["nlp", "natural language processing", "transformers", "spacy", "nltk"],
+            "computer vision": ["computer vision", "cv", "opencv"],
+            "analytics": ["analytics", "business intelligence", "bi", "tableau", "power bi"],
+            "rest": ["rest", "restful api", "api", "web api"],
+            "graphql": ["graphql"],
+            "web frameworks": ["django", "flask", "express", "spring", "rails", "fastapi"],
+            "frontend frameworks": ["react", "angular", "vue", "svelte", "ember"],
+            "html": ["html", "html5"],
+            "css": ["css", "css3", "scss", "sass", "less"],
+            "webpack": ["webpack", "rollup", "parcel"],
+            "microservices": ["microservices", "service oriented architecture", "soa"],
+            "devops": ["devops", "ci/cd", "continuous integration", "continuous delivery", "continuous deployment"],
+            "docker": ["docker", "containers"],
+            "kubernetes": ["kubernetes", "k8s", "kube"],
+            "terraform": ["terraform"],
+            "ansible": ["ansible"],
+            "chef": ["chef"],
+            "puppet": ["puppet"],
+            "helm": ["helm"],
+            "istio": ["istio", "service mesh"],
+            "prometheus": ["prometheus", "grafana", "monitoring"],
+            "logging": ["elk", "elasticsearch", "logstash", "kibana", "splunk"],
+            "cloud aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "cloudformation", "iam", "dynamodb"],
+            "cloud azure": ["azure", "microsoft azure", "azure functions", "azure devops", "arm templates"],
+            "cloud gcp": ["gcp", "google cloud", "google cloud platform", "gce", "bigquery", "cloud functions"],
+            "openstack": ["openstack"],
+            "serverless": ["serverless", "faas"],
+            "edge computing": ["edge computing"],
+            "networking": ["networking", "dns", "http", "tcp/ip"],
+            "security": ["security", "kubernetes security", "oauth2", "jwt", "tls", "ssl", "vault"],
+            "git": ["git", "gitlab", "github", "bitbucket"],
+            "ci tools": ["jenkins", "circleci", "travis ci", "github actions", "gitlab ci", "azure pipelines"],
+            "jira": ["jira", "confluence"],
+            "slack": ["slack"],
+            "docker-compose": ["docker-compose", "compose"],
+            "testing": ["testing", "unit test", "integration test", "pytest", "junit", "mocha", "jest"],
+            "performance": ["performance", "profiling", "benchmark"],
+            "cache": ["cache", "redis", "memcached"],
+            "microservices architecture": ["microservices architecture", "soa", "service mesh"],
+            "design patterns": ["design patterns", "solid", "ddd", "clean architecture"],
+            "architecture": ["architecture", "system design", "scalability", "high availability"],
+            "agile": ["agile", "scrum", "kanban"],
+            "devsecops": ["devsecops", "security as code", "shift left"],
+            "observability": ["observability", "opentelemetry", "logging", "tracing", "metrics"]
+        };
+
+        function normalizeSkills(skillsArr) {
+            const lowered = skillsArr.map(s => String(s).toLowerCase());
+            const out = new Set();
+            lowered.forEach(s => {
+                // direct canonical match
+                if (skill_dict[s]) {
+                    out.add(s);
+                    return;
+                }
+                // check aliases
+                for (const canonical in skill_dict) {
+                    const aliases = skill_dict[canonical];
+                    for (let i = 0; i < aliases.length; i++) {
+                        if (aliases[i] && s.indexOf(aliases[i]) !== -1) {
+                            out.add(canonical);
+                            return;
+                        }
+                    }
+                }
+                // fallback: add the original token
+                if (s) out.add(s);
+            });
+            return Array.from(out);
+        }
+
+        resume.skills = normalizeSkills(resume.skills);
     } else {
         // normalize the legacy shape
         resume.name = resume.name || "Unknown";
@@ -125,6 +223,78 @@ async function loadResume() {
     populateFilters();
     filterJobs();
 }
+
+// Global skill dictionary reused for matching (keeps parity with parser)
+const SKILL_DICT = {
+    "python": ["python", "python3", "cpython", "pypy"],
+    "java": ["java", "openjdk", "jdk", "jvm"],
+    "javascript": ["javascript", "js", "nodejs", "ecmascript"],
+    "typescript": ["typescript", "ts"],
+    "go": ["go", "golang"],
+    "c": ["c"],
+    "c++": ["c++", "cpp"],
+    "c#": ["c#", "csharp"],
+    "ruby": ["ruby", "ruby on rails", "rails"],
+    "php": ["php", "laravel", "symfony"],
+    "rust": ["rust"],
+    "kotlin": ["kotlin"],
+    "scala": ["scala"],
+    "r": ["r", "r language"],
+    "swift": ["swift"],
+    "shell": ["shell", "bash", "zsh", "sh"],
+    "perl": ["perl"],
+    "sql": ["sql", "mysql", "postgresql", "oracle", "sqlite", "mssql"],
+    "nosql": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
+    "big data": ["big data", "hadoop", "spark", "mapreduce", "hive", "pig"],
+    "data engineering": ["data engineering", "etl", "data pipeline", "airflow"],
+    "data science": ["data science", "machine learning", "ml", "statistics"],
+    "deep learning": ["deep learning", "neural networks", "tensorflow", "pytorch", "keras"],
+    "mlops": ["mlops", "model deployment", "model serving", "sagemaker", "mlflow"],
+    "nlp": ["nlp", "natural language processing", "transformers", "spacy", "nltk"],
+    "computer vision": ["computer vision", "cv", "opencv"],
+    "analytics": ["analytics", "business intelligence", "bi", "tableau", "power bi"],
+    "rest": ["rest", "restful api", "api", "web api"],
+    "graphql": ["graphql"],
+    "web frameworks": ["django", "flask", "express", "spring", "rails", "fastapi"],
+    "frontend frameworks": ["react", "angular", "vue", "svelte", "ember"],
+    "html": ["html", "html5"],
+    "css": ["css", "css3", "scss", "sass", "less"],
+    "webpack": ["webpack", "rollup", "parcel"],
+    "microservices": ["microservices", "service oriented architecture", "soa"],
+    "devops": ["devops", "ci/cd", "continuous integration", "continuous delivery", "continuous deployment"],
+    "docker": ["docker", "containers"],
+    "kubernetes": ["kubernetes", "k8s", "kube"],
+    "terraform": ["terraform"],
+    "ansible": ["ansible"],
+    "chef": ["chef"],
+    "puppet": ["puppet"],
+    "helm": ["helm"],
+    "istio": ["istio", "service mesh"],
+    "prometheus": ["prometheus", "grafana", "monitoring"],
+    "logging": ["elk", "elasticsearch", "logstash", "kibana", "splunk"],
+    "cloud aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "cloudformation", "iam", "dynamodb"],
+    "cloud azure": ["azure", "microsoft azure", "azure functions", "azure devops", "arm templates"],
+    "cloud gcp": ["gcp", "google cloud", "google cloud platform", "gce", "bigquery", "cloud functions"],
+    "openstack": ["openstack"],
+    "serverless": ["serverless", "faas"],
+    "edge computing": ["edge computing"],
+    "networking": ["networking", "dns", "http", "tcp/ip"],
+    "security": ["security", "kubernetes security", "oauth2", "jwt", "tls", "ssl", "vault"],
+    "git": ["git", "gitlab", "github", "bitbucket"],
+    "ci tools": ["jenkins", "circleci", "travis ci", "github actions", "gitlab ci", "azure pipelines"],
+    "jira": ["jira", "confluence"],
+    "slack": ["slack"],
+    "docker-compose": ["docker-compose", "compose"],
+    "testing": ["testing", "unit test", "integration test", "pytest", "junit", "mocha", "jest"],
+    "performance": ["performance", "profiling", "benchmark"],
+    "cache": ["cache", "redis", "memcached"],
+    "microservices architecture": ["microservices architecture", "soa", "service mesh"],
+    "design patterns": ["design patterns", "solid", "ddd", "clean architecture"],
+    "architecture": ["architecture", "system design", "scalability", "high availability"],
+    "agile": ["agile", "scrum", "kanban"],
+    "devsecops": ["devsecops", "security as code", "shift left"],
+    "observability": ["observability", "opentelemetry", "logging", "tracing", "metrics"]
+};
 
 function csvToArray(str) {
     const [headerLine, ...lines] = str.trim().split("\n");
@@ -249,9 +419,21 @@ function filterJobs() {
 function computeMatch(jobs) {
     const resumeSkills = window.resumeData.skills || [];
     jobs.forEach(job => {
-        const text = (job.job_summary || "").toLowerCase();
-        const matched = resumeSkills.filter(skill => text.includes(skill));
-        job.match_score = matched.length ? (matched.length / resumeSkills.length) * 100 : 0;
+        const text = ((job.job_summary || "") + " " + (job.job_description || "") + " " + (job.job_title || "") + " " + (job.job_industries || "")).toLowerCase();
+        let matchedCount = 0;
+        const matched = [];
+
+        resumeSkills.forEach(skill => {
+            const aliases = SKILL_DICT[skill] || [skill];
+            const foundAlias = aliases.find(a => a && text.indexOf(a) !== -1);
+            if (foundAlias) {
+                matchedCount += 1;
+                matched.push(skill);
+            }
+        });
+
+        job.match_score = resumeSkills.length ? (matchedCount / resumeSkills.length) * 100 : 0;
+        job.matched_skills = matched;
     });
 
     jobs.sort((a, b) => b.match_score - a.match_score);
