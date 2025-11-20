@@ -1,0 +1,6 @@
+[build]
+  publish = "webui/cvdashboard"
+  functions = "functions"
+
+# Optional: specify a command if you need a build step. For this project
+# the dashboard is static (no build), so no command is required.
