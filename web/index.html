@@ -162,11 +162,13 @@ async function parseResume() {
     const response = await sendJSON(resumeJSON);
     console.log("Backend response:", response);
 
-    // Show preview
-    document.getElementById("previewSection").classList.remove("d-none");
-    if (response) {
-      resumeJSON.inputs[0].competitive_score = response.competitive_score;
+    if (response && Array.isArray(response.predictions) && response.predictions.length > 0) {
+      const prediction = response.predictions[0];
+      resumeJSON.inputs[0].competitive_score = prediction.competitive_score;
     }
+
+    // Now show the preview *after* you've set the score
+    document.getElementById("previewSection").classList.remove("d-none");
     displayParsedResume();
 
     status.textContent = "✅ Resume parsed!";
