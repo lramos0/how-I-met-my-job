@@ -5,8 +5,15 @@
     <meta charset="UTF-8">
     <title>📄 Resume Parser Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
+    <!DOCTYPE html>
+    <html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <title>📄 Resume Parser Dashboard</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
 
 <body class="bg-light">
     <div class="container py-5">
@@ -182,17 +189,17 @@
             const rec = resumeJSON.inputs[0];
 
             document.getElementById("parsedOutput").innerHTML = `
-        <b>Name:</b> ${rec.full_name}<br>
-        <b>Location:</b> ${rec.location}<br>
-        <b>Education:</b> ${rec.education_level}<br>
-        <b>Years Experience:</b> ${rec.years_experience}<br>
-        <b>Title:</b> ${rec.current_title}<br>
-        <b>Skills:</b> ${rec.skills.join(", ") || "None detected"}<br>
-        <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
-        <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
-        <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}<br>
-        <b>Competitive Score:</b> ${rec.competitive_score !== undefined ? rec.competitive_score : "N/A"}
-    `;
+            <b>Name:</b> ${rec.full_name}<br>
+            <b>Location:</b> ${rec.location}<br>
+            <b>Education:</b> ${rec.education_level}<br>
+            <b>Years Experience:</b> ${rec.years_experience}<br>
+            <b>Title:</b> ${rec.current_title}<br>
+            <b>Skills:</b> ${rec.skills.join(", ") || "None detected"}<br>
+            <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
+            <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
+            <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}<br>
+            <b>Competitive Score:</b> ${rec.competitive_score !== undefined ? rec.competitive_score : "N/A"}
+        `;
         }
 
         /* --------------------------------------------------------
@@ -200,7 +207,7 @@
         --------------------------------------------------------- */
         function extractName(text) {
             // Stronger: looks for "Firstname Lastname" OR "First M. Last"
-            const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.\s+)?([A-Z][a-z]+)\b/);
+            const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.{1}\s+)?([A-Z][a-z]+)\b/);
             return match ? `${match[1]} ${match[2]}` : "Unknown";
         }
 
