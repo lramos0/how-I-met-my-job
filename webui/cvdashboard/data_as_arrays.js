@@ -1,0 +1,72 @@
+window.jobs = [
+    {
+        url: "https://www.linkedin.com/jobs/view/strategic-planning-analyst-at-decisionpoint-corporation-4255281355?_l=en",
+        job_title: "Strategic Planning Analyst",
+        company_name: "DecisionPoint Corporation",
+        job_location: "Fort George G. Meade, MD",
+        country_code: "US",
+        job_seniority_level: "Mid-Senior level",
+        job_employment_type: "Full-time",
+        job_industries: "Information Technology & Services",
+        job_summary: `DecisionPoint Corporation is seeking a Strategic Planning Analyst to join our team on an upcoming Defense Information Systems Agency (DISA) J-3/5/7 Operations and Strategic Support contract based at DISA Headquarters, Fort Meade, MD and MacDill AFB, FL, with flexible telework options. This opportunity involves supporting DISA’s J-3/5/7 Directorate... Active Secret clearance required. Bachelor's degree with a minimum of eight (8) years of relevant experience.`,
+        apply_link: "https://www.linkedin.com/jobs/view/externalApply/4255281355?url=https%3A%2F%2Fcareers-decisionpointcorp%2Eicims%2Ecom%2Fjobs%2F2940%2Fstrategic-planning-analyst%2Fjob%3Fmode%3Djob%26iis%3DJob%2BPosting%26iisn%3DLinkedIn&urlHash=8lhR",
+        job_base_pay_range: "",
+        job_posted_date: "2025-06-29T09:21:16.711Z"
+    },
+    {
+        url: "https://www.linkedin.com/jobs/view/senior-financial-analyst-at-jobot-4287647307?_l=en",
+        job_title: "Senior Financial Analyst",
+        company_name: "Jobot",
+        job_location: "Erie, PA",
+        country_code: "",
+        job_seniority_level: "Not Applicable",
+        job_employment_type: "Full-time",
+        job_industries: "Accounting, Financial Services, and Banking",
+        job_summary: `Next generational highly funded insurance healthcare company seeking an experienced Senior Financial Analyst... Jobot is an Equal Opportunity Employer.`,
+        apply_link: "",
+        job_base_pay_range: "$100,000.00/yr - $120,000.00/yr",
+        job_posted_date: "2025-08-25T08:23:24.452Z"
+    },
+    {
+        url: "https://www.linkedin.com/jobs/view/data-modeler-analyst-at-qkare-bilgi-teknolojileri-4283218074?_l=en",
+        job_title: "Data Modeler / Analyst",
+        company_name: "Qkare Bilgi Teknolojileri",
+        job_location: "Istanbul, Istanbul, Türkiye",
+        country_code: "",
+        job_seniority_level: "Mid-Senior level",
+        job_employment_type: "Full-time",
+        job_industries: "IT Services and IT Consulting",
+        job_summary: `Seeking a talented Data Modeler / Analyst for a leading beverage company in Turkey. Responsibilities include designing data models, developing SQL queries, creating data marts, collaborating with teams, and supporting reporting needs.`,
+        apply_link: "",
+        job_base_pay_range: "",
+        job_posted_date: "2025-08-15T05:51:32.827Z"
+    },
+    {
+        url: "https://www.linkedin.com/jobs/view/procurement-practice-analyst-at-accenture-in-india-4289949771?_l=en",
+        job_title: "Procurement Practice Analyst",
+        company_name: "Accenture in India",
+        job_location: "Bengaluru, Karnataka, India",
+        country_code: "",
+        job_seniority_level: "Entry level",
+        job_employment_type: "Full-time",
+        job_industries: "IT Services and IT Consulting",
+        job_summary: `Skill required: Contract Services - Contract management. Responsibilities include contract review, metadata entry, milestone tracking, drafting documents, coordinating with legal teams, and ensuring compliance.`,
+        apply_link: "https://www.linkedin.com/jobs/view/externalApply/4289949771?url=https%3A%2F%2Fwww%2Eaccenture%2Ecom%2Fin-en%2Fcareers%2Fjobdetails%3Fid%3DAIOC-S01600608_en%26src%3DLINKEDINJP&urlHash=Dy43",
+        job_base_pay_range: "",
+        job_posted_date: "2025-08-26T02:15:08.897Z"
+    },
+    {
+        url: "https://www.linkedin.com/jobs/view/compliance-analyst-at-unicon-international-inc-4264565225?_l=en",
+        job_title: "Compliance Analyst",
+        company_name: "UNICON International Inc.",
+        job_location: "Torrance, CA",
+        country_code: "US",
+        job_seniority_level: "Entry level",
+        job_employment_type: "Contract",
+        job_industries: "Motor Vehicle Manufacturing",
+        job_summary: `Hybrid role supporting regulatory monitoring, compliance gap analysis, internal audits, privacy activities, data mapping, and maintaining governance standards. Pay rate: $26.49/hr.`,
+        apply_link: "https://www.linkedin.com/jobs/view/externalApply/4264565225?url=https%3A%2F%2Fwww1%2Ejobdiva%2Ecom%2Fportal%2F%3Fa%3Davjdnw2udehimlhz6mihkn0by6cnvu08dbsajkvwgfrevsku7u4h5mt0skq11sfm%26SearchString%3D%26StatesString%3D%26source%3Dlinkedin%2Ecom%26id%3D30636239%26compid%3D-1&urlHash=uyVX",
+        job_base_pay_range: "",
+        job_posted_date: "2025-07-09T07:07:57.460Z"
+    }
+];
