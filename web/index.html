@@ -164,8 +164,8 @@ async function parseResume() {
 
     // Show preview
     document.getElementById("previewSection").classList.remove("d-none");
-    if (prediction) {
-      resumeJSON.inputs[0].competitive_score = prediction.competitive_score;
+    if (response) {
+      resumeJSON.inputs[0].competitive_score = response.competitive_score;
     }
     displayParsedResume();
 
