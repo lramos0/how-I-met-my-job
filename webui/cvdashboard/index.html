@@ -336,8 +336,90 @@
         }
 
         function estimateYears(text) {
-            const matches = [...text.matchAll(/(\d+)\s+years?/gi)];
-            return matches.length ? Math.max(...matches.map(m => parseInt(m[1]))) : 0;
+            // Robust years-of-experience extraction
+            // Handles patterns like:
+            //  - "3-5 years" or "3 – 5 years"
+            //  - "5 years and 6 months"
+            //  - "5+ years"
+            //  - "since 2015" or "2015-2019"
+            // Strategy: collect candidate numeric estimates and return the maximum (most likely total experience)
+            const lower = text.toLowerCase();
+            const now = new Date();
+            const currentYear = now.getFullYear();
+
+            const candidates = [];
+
+            // 1) Ranges like "3-5 years" -> use the upper bound
+            const rangeRe = /([0-9]+(?:\.[0-9]+)?)\s*[–-]\s*([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/gi;
+            let m;
+            while ((m = rangeRe.exec(lower)) !== null) {
+                const hi = parseFloat(m[2]);
+                if (!isNaN(hi)) candidates.push(hi);
+            }
+
+            // 2) "X years and Y months" or "X years, Y months"
+            const yrsMonthsRe = /([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\s*(?:and|,)?\s*([0-9]+)\s*(?:months?|mos?)\b/gi;
+            while ((m = yrsMonthsRe.exec(lower)) !== null) {
+                const yrs = parseFloat(m[1]);
+                const mos = parseInt(m[2]);
+                if (!isNaN(yrs) && !isNaN(mos)) candidates.push(yrs + mos / 12);
+            }
+
+            // 3) Simple years: "5 years" or "5+ years" or "5 yrs"
+            const yearsRe = /([0-9]+(?:\.[0-9]+)?)\s*\+?\s*(?:years?|yrs?)\b/gi;
+            while ((m = yearsRe.exec(lower)) !== null) {
+                const yrs = parseFloat(m[1]);
+                if (!isNaN(yrs)) candidates.push(yrs);
+            }
+
+            // 4) Months-only mentions (convert to years)
+            const monthsRe = /([0-9]+)\s*(?:months?|mos?)\b/gi;
+            while ((m = monthsRe.exec(lower)) !== null) {
+                const mos = parseInt(m[1]);
+                if (!isNaN(mos)) candidates.push(mos / 12);
+            }
+
+            // 5) "since 2015" -> assume continuous employment until now
+            const sinceRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
+            while ((m = sinceRe.exec(lower)) !== null) {
+                const year = parseInt(m[1] + m[0].slice(m[1].length + 6, m[0].length).match(/\d{2}/));
+                // The above is a fallback; we'll instead extract the 4-digit year more simply
+            }
+
+            // Better handling for 'since' and explicit year ranges like 2015-2019
+            const sinceYearRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
+            while ((m = sinceYearRe.exec(lower)) !== null) {
+                const yearMatch = m[0].match(/(19|20)\d{2}/);
+                if (yearMatch) {
+                    const y = parseInt(yearMatch[0]);
+                    if (!isNaN(y) && y <= currentYear) candidates.push(currentYear - y);
+                }
+            }
+
+            const yearRangeRe = /(19|20)\d{2}\s*[–-]\s*(?:present|now|(19|20)\d{2})/gi;
+            while ((m = yearRangeRe.exec(lower)) !== null) {
+                const parts = m[0].split(/[-–]/).map(p => p.trim());
+                const startMatch = parts[0].match(/(19|20)\d{2}/);
+                const endMatch = parts[1].match(/(19|20)\d{2}/);
+                if (startMatch) {
+                    const start = parseInt(startMatch[0]);
+                    let end = currentYear;
+                    if (endMatch) end = parseInt(endMatch[0]);
+                    if (!isNaN(start) && !isNaN(end) && end >= start) candidates.push(end - start);
+                }
+            }
+
+            // If we found any candidates return the maximum (likely total experience), rounded to one decimal
+            if (candidates.length) {
+                const max = Math.max(...candidates);
+                return Math.round(max * 10) / 10;
+            }
+
+            // Fallback: pick the largest bare number followed by 'years' or 'yrs' as before
+            const fallback = [...text.matchAll(/(\d+)\s+years?/gi)].map(m => parseInt(m[1]));
+            if (fallback.length) return Math.max(...fallback);
+
+            return 0;
         }
 
         function extractIndustries(text) {
