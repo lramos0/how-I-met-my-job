@@ -1,19 +1,91 @@
 async function loadResume() {
-    const data = localStorage.getItem("parsedResume");
+    let data = localStorage.getItem("parsedResume");
+
+    // If not in localStorage, try to load a local `parsed_resume.json` file (useful for testing).
     if (!data) {
-        alert("No resume found. Please parse one first.");
+        try {
+            const resp = await fetch('./parsed_resume.json');
+            if (resp.ok) {
+                const json = await resp.json();
+                data = JSON.stringify(json);
+                const msgEl = document.getElementById('dataMessage');
+                if (msgEl) {
+                    msgEl.innerHTML = `
+                        <div class="alert alert-info" role="alert">
+                            Loaded parsed resume from <code>parsed_resume.json</code> (fallback).
+                        </div>`;
+                }
+            }
+        } catch (e) {
+            // ignore fetch errors and fall through to alert below
+            console.warn('No parsed resume in localStorage and failed to fetch parsed_resume.json', e);
+        }
+    }
+
+    if (!data) {
+        alert("No resume found. Please parse one first or provide a local parsed_resume.json file.");
         window.location.href = "index.html";
         return;
     }
-    const resume = JSON.parse(data);
+
+    // Support two shapes:
+    // 1) Lightweight object saved as `parsedResume` (legacy): { name, email, education, skills: [] }
+    // 2) Parser output with `inputs: [{ ...fields... }]` produced by `index.html` parser
+    let raw = JSON.parse(data);
+    let resume = raw;
+    if (raw && raw.inputs && Array.isArray(raw.inputs) && raw.inputs.length) {
+        // prefer the first input record
+        resume = raw.inputs[0];
+        // normalize common keys for downstream code
+        resume.name = resume.full_name || resume.name || "Unknown";
+        resume.email = resume.email || resume.contact_email || "";
+        resume.education = resume.education_level || resume.education || "Unknown";
+        resume.years_experience = resume.years_experience || resume.years || 0;
+        resume.title = resume.current_title || resume.title || "Unknown";
+        resume.industries = resume.industries || resume.job_industries || [];
+        resume.certifications = resume.certifications || [];
+        resume.competitive_score = resume.competitive_score;
+        // ensure skills is an array
+        if (!Array.isArray(resume.skills)) {
+            if (typeof resume.skills === 'string' && resume.skills.trim()) {
+                resume.skills = resume.skills.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean);
+            } else {
+                resume.skills = [];
+            }
+        }
+    } else {
+        // normalize the legacy shape
+        resume.name = resume.name || "Unknown";
+        resume.email = resume.email || "";
+        resume.education = resume.education || "Unknown";
+        if (!Array.isArray(resume.skills)) {
+            resume.skills = typeof resume.skills === 'string' ? resume.skills.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean) : [];
+        }
+    }
+
     window.resumeData = resume;
 
+    // Show a richer resume summary on the jobs page
     document.getElementById("resumeSummary").innerHTML = `
-    <b>Name:</b> ${resume.name}<br>
-    <b>Email:</b> ${resume.email}<br>
-    <b>Education:</b> ${resume.education}<br>
-    <b>Skills:</b> ${resume.skills.join(", ")}
+    <div><b>Name:</b> ${resume.name}</div>
+    <div><b>Email:</b> ${resume.email || 'N/A'}</div>
+    <div><b>Title:</b> ${resume.title || 'N/A'}</div>
+    <div><b>Location:</b> ${resume.location || 'N/A'}</div>
+    <div><b>Education:</b> ${resume.education}</div>
+    <div><b>Years Exp:</b> ${resume.years_experience || 0}</div>
+    <div><b>Industries:</b> ${Array.isArray(resume.industries) ? resume.industries.join(', ') : (resume.industries || 'N/A')}</div>
+    <div><b>Certifications:</b> ${Array.isArray(resume.certifications) ? resume.certifications.join(', ') : (resume.certifications || 'None')}</div>
+    <div><b>Competitive Score:</b> ${resume.competitive_score !== undefined ? resume.competitive_score : 'N/A'}</div>
+    <div><b>Skills:</b> ${(Array.isArray(resume.skills) ? resume.skills.join(', ') : '') || 'None detected'}</div>
   `;
+
+    // Infer job-type insights and render them
+    try {
+        const insights = inferJobTypes(resume);
+        populateJobTypeInsights(insights);
+    } catch (e) {
+        console.warn('Failed to infer job types', e);
+    }
 
     // Use prebuilt `jobs` array from data_as_arrays.js (required).
     // Support both patterns: `window.jobs` (var) and top-level `const jobs = [...]`.
@@ -116,6 +188,10 @@ function filterJobs() {
     const postedFrom = document.getElementById("postedFrom") ? document.getElementById("postedFrom").value : '';
     const postedTo = document.getElementById("postedTo") ? document.getElementById("postedTo").value : '';
 
+    // Preferred filters set by insights UI (optional)
+    const preferredRoles = (window.preferredJobRoles || []).map(s => s.toLowerCase());
+    const preferredEmployment = (window.preferredEmploymentTypes || []).map(s => s.toLowerCase());
+
     let filtered = window.jobData.filter(job => {
         const jCompany = (job.company_name || "").toLowerCase();
         const jTitle = (job.job_title || "").toLowerCase();
@@ -142,6 +218,18 @@ function filterJobs() {
         const seniorityMatch = (!seniority || seniority === 'any') ? true : jSeniority.includes(seniority);
         const employmentMatch = (!employment || employment === 'any') ? true : jEmployment.includes(employment);
 
+        // If preferred roles are set, require at least one role to appear in title or industries
+        let preferredRoleMatch = true;
+        if (preferredRoles.length) {
+            preferredRoleMatch = preferredRoles.some(r => jTitle.includes(r) || jIndustries.includes(r));
+        }
+
+        // If preferred employment types are set, require job employment to match any
+        let preferredEmploymentMatch = true;
+        if (preferredEmployment.length) {
+            preferredEmploymentMatch = preferredEmployment.some(e => jEmployment.includes(e));
+        }
+
         let postedMatch = true;
         if (postedFrom) {
             if (jPostedDate) postedMatch = postedMatch && (jPostedDate >= postedFrom);
@@ -152,7 +240,7 @@ function filterJobs() {
             else postedMatch = false;
         }
 
-        return companyMatch && titleMatch && locationMatch && industryMatch && seniorityMatch && employmentMatch && postedMatch;
+        return companyMatch && titleMatch && locationMatch && industryMatch && seniorityMatch && employmentMatch && postedMatch && preferredRoleMatch && preferredEmploymentMatch;
     });
 
     computeMatch(filtered);
@@ -170,14 +258,254 @@ function computeMatch(jobs) {
     const top = jobs.slice(0, 10);
 
     const jobResults = document.getElementById("jobResults");
-    jobResults.innerHTML = top.map(job => `
-    <div class="border p-3 mb-2 rounded bg-white">
-      <b>${job.job_title}</b> at ${job.company_name} — ${job.job_location || "N/A"}<br>
-      🧠 Match Score: <b>${job.match_score.toFixed(1)}%</b>
-    </div>
-  `).join("");
+    jobResults.innerHTML = top.map(job => {
+        const title = job.job_title || job.title || 'N/A';
+        const company = job.company_name || job.company || 'N/A';
+        const location = job.job_location || job.location || 'N/A';
+        const jobType = job.job_employment_type || job.employment_type || job.type || 'N/A';
+        const applyLink = job.application_link || job.apply_url || job.url || job.job_apply_link || '#';
+        const posted = job.job_posted_date || job.posted_date || job.posted || '';
+        const salary = job.salary || job.pay || job.compensation || job.salary_range || job.pay_range || '';
+
+        // format salary display if object-like (min/max)
+        let salaryDisplay = '';
+        if (typeof salary === 'string' && salary.trim()) salaryDisplay = salary;
+        else if (typeof salary === 'object' && salary !== null) {
+            const min = salary.min || salary.min_salary || salary.salary_min;
+            const max = salary.max || salary.max_salary || salary.salary_max;
+            if (min || max) salaryDisplay = `$${min || '?'} - $${max || '?'} `;
+        }
+
+        return `
+        <div class="border p-3 mb-2 rounded bg-white">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div><b>${title}</b> <small class="text-muted">at ${company}</small></div>
+                    <div class="small text-muted">${location} • ${jobType} ${posted ? ' • Posted: ' + posted : ''}</div>
+                </div>
+                <div class="text-end">
+                    <div>🧠 Match: <b>${job.match_score.toFixed(1)}%</b></div>
+                    <div class="small">${salaryDisplay || ''}</div>
+                                <div class="mt-2"><button type="button" class="btn btn-sm btn-primary apply-btn" data-link="${applyLink}" data-title="${escapeHtml(title)}" data-company="${escapeHtml(company)}">Apply</button></div>
+                </div>
+            </div>
+            ${job.job_summary ? `<p class="mt-2 mb-0 small">${job.job_summary}</p>` : ''}
+        </div>
+    `;
+    }).join("");
+
+    // initialize apply modal handlers for the newly-rendered buttons
+    initApplyModal();
 
     drawChart(top);
+}
+
+/* --------------------
+   Job type inference + UI
+   -------------------- */
+function inferJobTypes(resume) {
+    // Build a normalized text blob from title, skills and industries
+    const titleText = (resume.title || '').toLowerCase();
+    const skillsText = Array.isArray(resume.skills) ? resume.skills.join(' ') : (resume.skills || '');
+    const industriesText = Array.isArray(resume.industries) ? resume.industries.join(' ') : (resume.industries || '');
+    const allText = (titleText + ' ' + skillsText + ' ' + industriesText).toLowerCase();
+
+    // Define keyword sets per role for better precision
+    const roleKeywords = {
+        'Software Engineer': ['software', 'engineer', 'developer', 'full stack', 'full-stack', 'backend', 'frontend', 'javascript', 'java', 'c#', 'c++', 'python', 'ruby', 'node', 'react'],
+        'Data / ML': ['data scientist', 'data engineer', 'data analyst', 'machine learning', 'ml', 'spark', 'pandas', 'numpy', 'scikit', 'tensorflow', 'pytorch', 'etl', 'big data'],
+        'Product / PM': ['product manager', 'product management', '\bpm\b', 'product lead', 'roadmap', 'stakeholder'],
+        'Management': ['manager', 'lead', 'supervisor', 'director', 'head of', 'people manager'],
+        'Education / Teaching': ['teacher', 'education', 'instructor', 'professor', 'tutor', 'curriculum'],
+        'Healthcare': ['nurse', 'healthcare', 'clinical', 'medical', 'caregiver', 'patient'],
+        'Sales': ['sales', 'account executive', 'business development', 'bdm'],
+        'Research': ['research', 'researcher', 'laboratory', 'lab', 'experimental'],
+        'Intern / Entry Level': ['intern', 'internship', 'entry level', 'graduate', 'student']
+    };
+
+    // Map industries to suggested roles (soft mapping)
+    const industryRoleMap = {
+        'software': ['Software Engineer'],
+        'technology': ['Software Engineer', 'Data / ML'],
+        'education': ['Education / Teaching'],
+        'health': ['Healthcare'],
+        'finance': ['Data / ML', 'Finance'],
+        'research': ['Research']
+    };
+
+    const roles = [];
+
+    // Score each role by counting keyword matches (case-insensitive)
+    Object.keys(roleKeywords).forEach(role => {
+        const kws = roleKeywords[role];
+        let matches = 0;
+        kws.forEach(k => {
+            try {
+                const re = new RegExp(k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+                if (allText.match(re)) matches += (allText.match(re) || []).length;
+            } catch (e) {
+                // if regex creation fails fallback to indexOf
+                if (allText.indexOf(k.toLowerCase()) !== -1) matches++;
+            }
+        });
+        if (matches > 0) {
+            // confidence: matched keywords / total keywords (capped at 1) scaled to 0-100
+            const score = Math.min(100, Math.round((matches / kws.length) * 100));
+            roles.push({ name: role, score });
+        }
+    });
+
+    // Augment roles from industry names when role not present
+    if (roles.length === 0 && industriesText) {
+        Object.keys(industryRoleMap).forEach(ind => {
+            if (industriesText.includes(ind)) {
+                industryRoleMap[ind].forEach(r => {
+                    // add with low confidence (40)
+                    roles.push({ name: r, score: 40 });
+                });
+            }
+        });
+    }
+
+    // Employment types with keyword sets and scoring
+    const employmentKeywords = {
+        'Full-time': ['full time', 'full-time', 'fulltime'],
+        'Part-time': ['part time', 'part-time', 'parttime'],
+        'Contract': ['contract', 'contractor'],
+        'Temporary': ['temporary', '\btemp\b'],
+        'Remote': ['remote', 'work from home', 'telecommute']
+    };
+    const employment = [];
+    Object.keys(employmentKeywords).forEach(e => {
+        const kws = employmentKeywords[e];
+        let matches = 0;
+        kws.forEach(k => { if (allText.includes(k)) matches++; });
+        if (matches > 0) {
+            const score = Math.min(100, Math.round((matches / kws.length) * 100));
+            employment.push({ name: e, score });
+        }
+    });
+
+    // Sort roles by confidence desc
+    roles.sort((a, b) => b.score - a.score);
+    employment.sort((a, b) => b.score - a.score);
+
+    return { roles, employment };
+}
+
+function populateJobTypeInsights(insights) {
+    const container = document.getElementById('jobTypeInsights');
+    if (!container) return;
+    const roles = insights.roles || [];
+    const employment = insights.employment || [];
+
+    const parts = [];
+    parts.push('<div class="fw-bold">Suggested Job Types</div>');
+
+    if (roles.length) {
+        parts.push('<div class="mt-2"><small class="text-muted">Roles you may prefer:</small>');
+        parts.push('<div class="d-flex flex-wrap gap-2 mt-1">');
+        roles.forEach(r => {
+            const safe = escapeHtml(r.name);
+            const id = 'role_' + safe.replace(/\s+/g, '_');
+            parts.push(`<label class="form-check form-check-inline mb-1"><input class="form-check-input jobtype-role" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-primary ms-1">${r.score}%</span></span></label>`);
+        });
+        parts.push('</div></div>');
+    }
+
+    if (employment.length) {
+        parts.push('<div class="mt-2"><small class="text-muted">Employment types in resume:</small>');
+        parts.push('<div class="d-flex flex-wrap gap-2 mt-1">');
+        employment.forEach(e => {
+            const safe = escapeHtml(e.name);
+            const id = 'emp_' + safe.replace(/\s+/g, '_');
+            parts.push(`<label class="form-check form-check-inline mb-1"><input class="form-check-input jobtype-emp" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-secondary ms-1">${e.score}%</span></span></label>`);
+        });
+        parts.push('</div></div>');
+    }
+
+    parts.push('<div class="mt-2"><button id="applyPreferredBtn" class="btn btn-sm btn-outline-primary me-2">Apply selected types</button><button id="clearPreferredBtn" class="btn btn-sm btn-outline-secondary">Clear</button></div>');
+
+    container.innerHTML = parts.join('');
+
+    // wire buttons
+    const apply = document.getElementById('applyPreferredBtn');
+    const clear = document.getElementById('clearPreferredBtn');
+    if (apply) apply.addEventListener('click', () => {
+        const selRoles = Array.from(document.querySelectorAll('.jobtype-role:checked')).map(i => i.value);
+        const selEmp = Array.from(document.querySelectorAll('.jobtype-emp:checked')).map(i => i.value);
+        window.preferredJobRoles = selRoles;
+        window.preferredEmploymentTypes = selEmp;
+        filterJobs();
+    });
+    if (clear) clear.addEventListener('click', () => {
+        Array.from(document.querySelectorAll('.jobtype-role:checked, .jobtype-emp:checked')).forEach(i => i.checked = false);
+        window.preferredJobRoles = [];
+        window.preferredEmploymentTypes = [];
+        filterJobs();
+    });
+}
+
+// Simple helper to escape HTML in attributes
+function escapeHtml(str) {
+    return String(str).replace(/[&"'<>]/g, function (s) {
+        return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
+    });
+}
+
+// Modal handling for Apply confirmation
+function showApplyModal(link, title, company) {
+    const modal = document.getElementById('applyModal');
+    if (!modal) return;
+    const body = document.getElementById('applyModalBody');
+    const heading = document.getElementById('applyModalTitle');
+    heading.textContent = `Open application for: ${title} @ ${company}`;
+    body.textContent = 'This will open the application page in a new tab. Continue?';
+    modal.dataset.link = link;
+    modal.style.display = 'flex';
+}
+
+function hideApplyModal() {
+    const modal = document.getElementById('applyModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    delete modal.dataset.link;
+}
+
+function initApplyModal() {
+    const jobResults = document.getElementById('jobResults');
+    if (jobResults) {
+        jobResults.addEventListener('click', (e) => {
+            const btn = e.target.closest('.apply-btn');
+            if (!btn) return;
+            const link = btn.getAttribute('data-link') || '#';
+            const title = btn.getAttribute('data-title') || 'Job';
+            const company = btn.getAttribute('data-company') || '';
+            showApplyModal(link, title, company);
+        });
+    }
+
+    const cancel = document.getElementById('applyCancelBtn');
+    const confirm = document.getElementById('applyConfirmBtn');
+    const modal = document.getElementById('applyModal');
+    if (cancel) cancel.addEventListener('click', hideApplyModal);
+    if (confirm) confirm.addEventListener('click', () => {
+        if (!modal) return;
+        const link = modal.dataset.link;
+        if (link) {
+            try {
+                window.open(link, '_blank', 'noopener');
+            } catch (e) {
+                // fallback
+                const a = document.createElement('a');
+                a.href = link;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.click();
+            }
+        }
+        hideApplyModal();
+    });
 }
 
 function drawChart(topJobs) {
