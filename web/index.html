@@ -187,7 +187,8 @@ function displayParsedResume() {
         <b>Skills:</b> ${rec.skills.join(", ") || "None detected"}<br>
         <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
         <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
-        <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}
+        <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}<br>
+        <b>Competitive Score:</b> ${rec.competitive_score !== undefined ? rec.competitive_score : "N/A"}
     `;
 }
 
