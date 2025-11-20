@@ -164,9 +164,10 @@ async function parseResume() {
 
     // Show preview
     document.getElementById("previewSection").classList.remove("d-none");
-
+    if (prediction) {
+      resumeJSON.inputs[0].competitive_score = prediction.competitive_score;
+    }
     displayParsedResume();
-    displayBackendScore(response);
 
     status.textContent = "✅ Resume parsed!";
 }
@@ -187,34 +188,6 @@ function displayParsedResume() {
         <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
         <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
         <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}
-    `;
-}
-
-/* --------------------------------------------------------
-   DISPLAY BACKEND RESULTS
---------------------------------------------------------- */
-function displayBackendScore(response) {
-    const box = document.getElementById("backendOutput");
-
-    if (!response) {
-        box.innerHTML = `<p class="text-danger">⚠️ No backend response.</p>`;
-        return;
-    }
-
-    const competitiveness = response.competitiveness_score ?? "N/A";
-    const labels = response.labels?.join(", ") ?? "None";
-    const confidence =
-        response.confidence ? Math.round(response.confidence * 100) + "%" : "N/A";
-
-    box.innerHTML = `
-        <h5 class="fw-bold">📊 Competitiveness Score</h5>
-        <p class="fs-3 fw-bold text-primary">${competitiveness} / 100</p>
-
-        <h6 class="fw-bold mt-3">Predicted Categories</h6>
-        <p>${labels}</p>
-
-        <h6 class="fw-bold mt-3">Model Confidence</h6>
-        <p>${confidence}</p>
     `;
 }
 
