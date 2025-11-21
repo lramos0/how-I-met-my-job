@@ -1,54 +1,81 @@
 // netlify/functions/classify-cv.mjs
 export default async (req, context) => {
-  // --- 1) Parse incoming body safely ---
-  const requestBody = await req.json();
+  try {
+    // --- 1) Parse incoming body safely ---
+    let requestBody = {};
+    try {
+      requestBody = await req.json();
+    } catch (err) {
+      console.error("Failed to parse incoming JSON:", err);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON input" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const DATABRICKS_URL = "https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/user-score/invocations";
+    // --- 2) Auth logic ---
+    const accessKeyPub = process.env.DBX_KEY;
+    const betaPassword = process.env.BETA_PASSWORD;
 
-  // --- 2) Auth logic (unchanged, but safer) ---
-  const accessKeyPub  = process.env.DBX_KEY;
-  const betaPassword  = process.env.BETA_PASSWORD;
+    let accessKey = accessKeyPub;
+    if (requestBody.accessKey === betaPassword) {
+      accessKey = accessKeyPub;
+    }
 
-  // Your current contract uses either: 
-  // - requestBody.password as the token, OR
-  // - requestBody.accessKey matching betaPassword to elevate to DBX_KEY
-  let accessKey = accessKeyPub;
-  if (requestBody.accessKey === betaPassword) {
-    accessKey = accessKeyPub;
-  }
+    // --- 3) Remove sensitive fields ---
+    if (requestBody) {
+      delete requestBody.accessKey;
+      delete requestBody.pin;
+      delete requestBody.password;
+    }
 
-  // Remove sensitive inputs we don't want to forward
-  if (requestBody) {
-    delete requestBody.accessKey;
-    delete requestBody.pin;
-    delete requestBody.password; // don't forward raw password to Databricks
-  }
+    if (!accessKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing access token" }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
-  if (!accessKey) {
+    // --- 4) Log the full outgoing request ---
+    console.log("Sending to Databricks:", JSON.stringify(requestBody, null, 2));
+
+    // --- 5) Send to Databricks ---
+    // --- Send request ---
+    const response = await fetch(DATABRICKS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    // --- Check status ---
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Databricks error:", response.status, text);
+      return new Response(JSON.stringify({ error: text }), { status: response.status });
+    }
+
+    // --- Parse JSON safely ---
+    let result;
+    try {
+      result = await response.json();
+    } catch (err) {
+      const rawText = await response.text();
+      console.error("Failed to parse JSON:", err, rawText);
+      result = { error: "Invalid JSON from Databricks", raw: rawText };
+    }
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("Unexpected error:", err);
     return new Response(
-      JSON.stringify({ error: "Missing access token" }),
-      { status: 401, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Internal Server Error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
-
- const response = await fetch("https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/job-difficulty/invocations", {
-     method: "POST",
-     headers: {
-       "Content-Type": "application/json",
-       Authorization: `Bearer ${accessKey}`
-     },
-     body: JSON.stringify(requestBody)
-   });
-
-   if (!response.ok) {
-     return new Response(JSON.stringify({ error: "Databricks request failed" }), {
-       status: response.status,
-       headers: { "Content-Type": "application/json" }
-     });
-   }
-
-   const result = await response.json();
-
-   return new Response(JSON.stringify(result), {
-     status: 200,
-     headers: { "Content-Type": "application/json" }
-   });
-};
+}; // <-- Closing brace added here
