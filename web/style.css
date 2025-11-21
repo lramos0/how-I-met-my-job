@@ -1,0 +1,122 @@
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f3f2ef;
+    /* LinkedIn-like light gray background */
+    color: #000000e6;
+}
+
+.card {
+    border: 1px solid #e0e0e0;
+    border-radius: 0.8rem;
+    background-color: #fff;
+    transition: box-shadow 0.2s ease;
+}
+
+.job-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #d0d0d0;
+}
+
+.job-title-link {
+    color: #0a66c2;
+    /* LinkedIn Blue */
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.job-title-link:hover {
+    text-decoration: underline;
+    color: #004182;
+}
+
+.company-name {
+    color: #000000e6;
+    font-weight: 400;
+}
+
+.metadata-text {
+    color: #00000099;
+    font-size: 0.9rem;
+}
+
+.job-summary {
+    font-size: 0.9rem;
+    color: #000000e6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.5;
+}
+
+.btn-apply {
+    background-color: #0a66c2;
+    color: white;
+    border-radius: 1.5rem;
+    font-weight: 600;
+    padding: 0.375rem 1rem;
+    transition: background-color 0.15s;
+}
+
+.btn-apply:hover {
+    background-color: #004182;
+    color: white;
+}
+
+/* Compact UI tweaks for filters */
+.compact .card {
+    padding: 0.75rem !important;
+}
+
+.compact h6,
+.compact h5 {
+    font-size: 0.95rem;
+}
+
+.compact .form-label,
+.compact .form-control-sm,
+.compact .form-select-sm {
+    font-size: 0.85rem;
+}
+
+#resumeSummary {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* Match Score Badge */
+.match-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Modal Overlay */
+.backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+}
+
+/* Modal Dialog */
+.dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+/* Modal is hidden by default */
+#applyModal {
+    display: none;
+}

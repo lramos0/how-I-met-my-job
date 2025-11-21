@@ -178,6 +178,7 @@ async function loadResume() {
   `;
 
     // Infer job-type insights and render them
+    // Infer job-type insights and render them
     try {
         const insights = inferJobTypes(resume);
         populateJobTypeInsights(insights);
@@ -185,38 +186,51 @@ async function loadResume() {
         console.warn('Failed to infer job types', e);
     }
 
-    // Use prebuilt `jobs` array from data_as_arrays.js (required).
-    // Support both patterns: `window.jobs` (var) and top-level `const jobs = [...]`.
-    let sourceJobs = null;
-    if (Array.isArray(window.jobs) && window.jobs.length) sourceJobs = window.jobs;
-    else if (typeof jobs !== 'undefined' && Array.isArray(jobs) && jobs.length) sourceJobs = jobs;
+    // Fetch jobs from backend
+    try {
+        const response = await fetch("/.netlify/functions/get-jobs");
+        if (!response.ok) throw new Error("Failed to load jobs");
+        const jobsData = await response.json();
 
-    if (sourceJobs) {
-        window.jobData = sourceJobs.map(item => {
+        window.jobData = jobsData.map(item => {
+            // Normalize keys to lowercase and handle Supabase/Firestore schema differences
+            const o = {};
             if (item && typeof item === 'object' && !Array.isArray(item)) {
-                const o = {};
-                Object.keys(item).forEach(k => { o[k.trim().toLowerCase()] = item[k]; });
-                return o;
+                Object.keys(item).forEach(k => {
+                    o[k.trim().toLowerCase()] = item[k];
+                });
+
+                // Ensure job_employment_type is populated if it comes as employment_type
+                if (!o.job_employment_type && o.employment_type) {
+                    o.job_employment_type = o.employment_type;
+                }
+                // Ensure job_seniority_level is populated if it comes as seniority_level
+                if (!o.job_seniority_level && o.seniority_level) {
+                    o.job_seniority_level = o.seniority_level;
+                }
+                // Ensure job_posted_date is populated if it comes as posted_date
+                if (!o.job_posted_date && o.posted_date) {
+                    o.job_posted_date = o.posted_date;
+                }
             }
-            return item;
+            return o;
         });
-        // show a small banner indicating which dataset is used
+
         const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
-                <div class="alert alert-info" role="alert">
-                    Using dataset from <code>data_as_arrays.js</code> (loaded as <code>jobs</code>).
+                <div class="alert alert-success" role="alert">
+                    Loaded ${window.jobData.length} jobs from live database.
                 </div>`;
         }
-    } else {
-        console.error('Prebuilt `jobs` array not found. Please include data_as_arrays.js that defines `jobs`.');
+    } catch (err) {
+        console.error(err);
         window.jobData = [];
         const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
-                <div class="alert alert-warning" role="alert">
-                    <strong>Jobs data not loaded:</strong> the prebuilt dataset <code>data_as_arrays.js</code> was not found or does not define <code>jobs</code>.
-                    Please ensure the dataset file is included and defines <code>const jobs = [...]</code> or <code>window.jobs = [...]</code>.
+                <div class="alert alert-danger" role="alert">
+                    <strong>Error loading jobs:</strong> ${err.message}.
                 </div>`;
         }
     }
@@ -416,6 +430,35 @@ function filterJobs() {
     computeMatch(filtered);
 }
 
+function timeAgo(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date)) return dateString; // Fallback if not a valid date
+
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    let interval = Math.floor(seconds / 31536000);
+    if (interval >= 1) return interval + " yr" + (interval === 1 ? "" : "s") + " ago";
+
+    interval = Math.floor(seconds / 2592000);
+    if (interval >= 1) return interval + " mo" + (interval === 1 ? "" : "s") + " ago";
+
+    interval = Math.floor(seconds / 604800);
+    if (interval >= 1) return interval + " wk" + (interval === 1 ? "" : "s") + " ago";
+
+    interval = Math.floor(seconds / 86400);
+    if (interval >= 1) return interval + " day" + (interval === 1 ? "" : "s") + " ago";
+
+    interval = Math.floor(seconds / 3600);
+    if (interval >= 1) return interval + " hr" + (interval === 1 ? "" : "s") + " ago";
+
+    interval = Math.floor(seconds / 60);
+    if (interval >= 1) return interval + " min" + (interval === 1 ? "" : "s") + " ago";
+
+    return "Just now";
+}
+
 function computeMatch(jobs) {
     const resumeSkills = window.resumeData.skills || [];
     jobs.forEach(job => {
@@ -437,7 +480,7 @@ function computeMatch(jobs) {
     });
 
     jobs.sort((a, b) => b.match_score - a.match_score);
-    const top = jobs.slice(0, 10);
+    const top = jobs.slice(0, 50); // Limit to 50 as requested
 
     const jobResults = document.getElementById("jobResults");
     jobResults.innerHTML = top.map(job => {
@@ -445,8 +488,17 @@ function computeMatch(jobs) {
         const company = job.company_name || job.company || 'N/A';
         const location = job.job_location || job.location || 'N/A';
         const jobType = job.job_employment_type || job.employment_type || job.type || 'N/A';
-        const applyLink = job.application_link || job.apply_url || job.url || job.job_apply_link || '#';
-        const posted = job.job_posted_date || job.posted_date || job.posted || '';
+        const seniority = job.job_seniority_level || job.seniority_level || 'N/A';
+        const applyLink = job.job_url || job.url || job.apply_link || job.application_link || '#';
+
+        // Handle posted date parsing
+        let postedRaw = job.job_posted_date || job.posted_date || job.posted;
+        // If it's an object with seconds (Firestore style) or just needs standardizing
+        if (postedRaw && typeof postedRaw === 'object' && postedRaw.seconds) {
+            postedRaw = new Date(postedRaw.seconds * 1000).toISOString();
+        }
+        const postedRelative = timeAgo(postedRaw);
+
         const salary = job.salary || job.pay || job.compensation || job.salary_range || job.pay_range || '';
 
         // format salary display if object-like (min/max)
@@ -458,20 +510,43 @@ function computeMatch(jobs) {
             if (min || max) salaryDisplay = `$${min || '?'} - $${max || '?'} `;
         }
 
+        // Match score color
+        let matchColor = 'bg-secondary';
+        if (job.match_score >= 70) matchColor = 'bg-success';
+        else if (job.match_score >= 40) matchColor = 'bg-warning text-dark';
+
         return `
-        <div class="border p-3 mb-2 rounded bg-white">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <div><b>${title}</b> <small class="text-muted">at ${company}</small></div>
-                    <div class="small text-muted">${location} • ${jobType} ${posted ? ' • Posted: ' + posted : ''}</div>
+        <div class="card job-card mb-3 p-3">
+            <div class="row g-0">
+                <div class="col-md-10">
+                    <h5 class="mb-1">
+                        <a href="${applyLink}" target="_blank" class="job-title-link stretched-link-custom">${title}</a>
+                    </h5>
+                    <div class="mb-2">
+                        <span class="company-name">${company}</span>
+                        <span class="metadata-text mx-1">•</span>
+                        <span class="metadata-text">${location}</span>
+                    </div>
+                    
+                    <div class="mb-2 metadata-text">
+                        ${jobType !== 'N/A' ? `<span class="me-3"><i class="bi bi-briefcase-fill me-1"></i>${jobType}</span>` : ''}
+                        ${seniority !== 'N/A' ? `<span class="me-3"><i class="bi bi-bar-chart-fill me-1"></i>${seniority}</span>` : ''}
+                        ${salaryDisplay ? `<span class="me-3"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
+                        <span class="text-success"><i class="bi bi-clock-history me-1"></i>${postedRelative}</span>
+                    </div>
+
+                    ${job.job_summary ? `<div class="job-summary text-muted mt-2">${job.job_summary}</div>` : ''}
                 </div>
-                <div class="text-end">
-                    <div>🧠 Match: <b>${job.match_score.toFixed(1)}%</b></div>
-                    <div class="small">${salaryDisplay || ''}</div>
-                                <div class="mt-2"><button type="button" class="btn btn-sm btn-primary apply-btn" data-link="${applyLink}" data-title="${escapeHtml(title)}" data-company="${escapeHtml(company)}">Apply</button></div>
+                
+                <div class="col-md-2 d-flex flex-column align-items-end justify-content-between">
+                    <span class="badge ${matchColor} match-badge p-2 rounded-pill">
+                        ${job.match_score.toFixed(0)}% Match
+                    </span>
+                    <div class="mt-3">
+                         <a href="${applyLink}" target="_blank" class="btn btn-apply btn-sm text-decoration-none">Apply</a>
+                    </div>
                 </div>
             </div>
-            ${job.job_summary ? `<p class="mt-2 mb-0 small">${job.job_summary}</p>` : ''}
         </div>
     `;
     }).join("");

@@ -1,7 +1,4 @@
-
-streamlit
 pandas
 sentence-transformers
 PyMuPDF
-matplotlib
 scikit-learn
