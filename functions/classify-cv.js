@@ -2,7 +2,7 @@ exports.handler = async (event) => {
     try {
         const body = event.body ? JSON.parse(event.body) : {};
 
-        // Simple password check (keeps parity with frontend)
+        // Checks password to match frontend
         if (!body.password || body.password !== 'craig123') {
             return {
                 statusCode: 401,
@@ -12,7 +12,7 @@ exports.handler = async (event) => {
 
         const inputs = Array.isArray(body.inputs) ? body.inputs : [];
 
-        // Create a simple mocked prediction for each input
+        // Makes fake predictions for inputs
         const predictions = inputs.map((input) => ({
             candidate_id: input.candidate_id || null,
             competitive_score: Math.round(Math.random() * 100),

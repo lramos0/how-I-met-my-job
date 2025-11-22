@@ -53,7 +53,7 @@
                 for (const item of textContent.items) {
                     const text = item.str;
 
-                    // detect line breaks using vertical movement
+                    // Detects line breaks with vertical movement
                     if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
                         pageText += "\n";
                     }
@@ -64,109 +64,6 @@
 
                 finalText += pageText + "\n\n";
             }
-
-            // Clean up weird double-spacing PDF.js often leaves
-            finalText = finalText
-                .replace(/\s{2,}/g, " ")
-                .replace(/\n{3,}/g, "\n\n")
-                .trim();
-
-            return finalText;
-        }
-
-
-        /* --------------------------------------------------------
-           FIX SMASHED WORDS
-        --------------------------------------------------------- */
-        function restoreWordBoundaries(text) {
-            return text
-                .replace(/([a-z])([A-Z])/g, "$1 $2")
-                .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
-                .replace(/(\D)(\d)/g, "$1 $2")
-                .replace(/(\d)(\D)/g, "$1 $2")
-                .replace(/\s{2,}/g, " ")
-                .trim();
-        }
-
-        /* --------------------------------------------------------
-           SEND JSON → BACKEND
-        --------------------------------------------------------- */
-        async function sendJSON(bodyObj) {
-            try {
-                const response = await fetch("/.netlify/functions/classify-cv", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(bodyObj)
-                });
-
-                const text = await response.text();
-                try {
-                    return JSON.parse(text);
-                } catch {
-                    console.error("Backend returned non-JSON:", text);
-                    return null;
-                }
-            } catch (e) {
-                console.error("Backend error:", e);
-                return null;
-            }
-        }
-
-        let resumeJSON = null;
-
-        /* --------------------------------------------------------
-           MAIN PARSER
-        --------------------------------------------------------- */
-        async function parseResume() {
-            const fileInput = document.getElementById("resumeFile");
-            const status = document.getElementById("statusMsg");
-
-            if (!fileInput.files.length) {
-                alert("Please upload a resume file first.");
-                return;
-            }
-
-            const file = fileInput.files[0];
-            status.textContent = `📄 Extracting text from ${file.name}…`;
-
-            let resumeText = file.name.endsWith(".pdf")
-                ? await extractPdfText(file)
-                : await file.text();
-
-            resumeText = restoreWordBoundaries(resumeText);
-            console.log("Restored Resume Text:", resumeText);
-
-            status.textContent = "🤖 Parsing resume…";
-
-            resumeJSON = {
-                inputs: [{
-                    candidate_id: "CAND-" + Date.now(),
-                    full_name: extractName(resumeText),
-                    location: extractLocation(resumeText),
-                    education_level: extractEducation(resumeText),
-                    years_experience: estimateYears(resumeText),
-                    skills: extractSkills(resumeText),
-                    certifications: extractCerts(resumeText),
-                    current_title: extractTitle(resumeText),
-                    industries: extractIndustries(resumeText),
-                    achievements: extractAchievements(resumeText)
-                }],
-                password: "craig123"
-            };
-
-            status.textContent = "📡 Sending to backend…";
-
-            const response = await sendJSON(resumeJSON);
-            console.log("Backend response:", response);
-
-            if (response && Array.isArray(response.predictions) && response.predictions.length > 0) {
-                const prediction = response.predictions[0];
-                resumeJSON.inputs[0].competitive_score = prediction.competitive_score;
-            }
-
-            // Now show the preview *after* you've set the score
-            document.getElementById("previewSection").classList.remove("d-none");
-            displayParsedResume();
 
             status.textContent = "✅ Resume parsed!";
         }
@@ -195,7 +92,7 @@
            FIELD EXTRACTORS
         --------------------------------------------------------- */
         function extractName(text) {
-            // Stronger: looks for "Firstname Lastname" OR "First M. Last"
+            // Looks for "Firstname Lastname" or "First M. Last"
             const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.{1}\s+)?([A-Z][a-z]+)\b/);
             return match ? `${match[1]} ${match[2]}` : "Unknown";
         }
@@ -213,7 +110,7 @@
         }
 
         function extractSkills(text) {
-            // Expanded skill dictionary (canonical -> aliases)
+            // Skill dictionary (canonical -> aliases)
             const skill_dict = {
                 "python": ["python", "python3", "cpython", "pypy"],
                 "java": ["java", "openjdk", "jdk", "jvm"],
@@ -288,7 +185,7 @@
             const lower = text.toLowerCase();
             const found = [];
 
-            // Iterate canonical skills and check aliases (short-circuit on first alias match)
+            // Checks aliases for each skill
             for (const canonical in skill_dict) {
                 const aliases = skill_dict[canonical];
                 for (let i = 0; i < aliases.length; i++) {
@@ -301,59 +198,13 @@
                 }
             }
 
-            // Remove duplicates and return
+            // Removes duplicates
             return Array.from(new Set(found));
         }
 
         function extractCerts(text) {
             const certs = [];
             if (/aws solutions architect/i.test(text)) certs.push("AWS Solutions Architect");
-            if (/pmp/i.test(text)) certs.push("PMP");
-            return certs;
-        }
-
-        function extractTitle(text) {
-            const roles = [
-                "Software Engineer", "ML Engineer", "Data Scientist", "Developer",
-                "Teacher", "Counselor", "Supervisor", "Specialist", "Consultant", "Manager", "Data Analyst", "Business Analyst"
-            ];
-            for (let r of roles) {
-                const regex = new RegExp(r, "i");
-                if (regex.test(text)) return r;
-            }
-            return "Unknown";
-        }
-
-        function estimateYears(text) {
-            // Robust years-of-experience extraction
-            // Handles patterns like:
-            //  - "3-5 years" or "3 – 5 years"
-            //  - "5 years and 6 months"
-            //  - "5+ years"
-            //  - "since 2015" or "2015-2019"
-            // Strategy: collect candidate numeric estimates and return the maximum (most likely total experience)
-            const lower = text.toLowerCase();
-            const now = new Date();
-            const currentYear = now.getFullYear();
-
-            const candidates = [];
-
-            // 1) Ranges like "3-5 years" -> use the upper bound
-            const rangeRe = /([0-9]+(?:\.[0-9]+)?)\s*[–-]\s*([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\b/gi;
-            let m;
-            while ((m = rangeRe.exec(lower)) !== null) {
-                const hi = parseFloat(m[2]);
-                if (!isNaN(hi)) candidates.push(hi);
-            }
-
-            // 2) "X years and Y months" or "X years, Y months"
-            const yrsMonthsRe = /([0-9]+(?:\.[0-9]+)?)\s*(?:years?|yrs?)\s*(?:and|,)?\s*([0-9]+)\s*(?:months?|mos?)\b/gi;
-            while ((m = yrsMonthsRe.exec(lower)) !== null) {
-                const yrs = parseFloat(m[1]);
-                const mos = parseInt(m[2]);
-                if (!isNaN(yrs) && !isNaN(mos)) candidates.push(yrs + mos / 12);
-            }
-
             // 3) Simple years: "5 years" or "5+ years" or "5 yrs"
             const yearsRe = /([0-9]+(?:\.[0-9]+)?)\s*\+?\s*(?:years?|yrs?)\b/gi;
             while ((m = yearsRe.exec(lower)) !== null) {
@@ -368,14 +219,14 @@
                 if (!isNaN(mos)) candidates.push(mos / 12);
             }
 
-            // 5) "since 2015" -> assume continuous employment until now
+            // 5) "since 2015" (assumes continuous employment)
             const sinceRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
             while ((m = sinceRe.exec(lower)) !== null) {
                 const year = parseInt(m[1] + m[0].slice(m[1].length + 6, m[0].length).match(/\d{2}/));
-                // The above is a fallback; we'll instead extract the 4-digit year more simply
+                // Fallback logic
             }
 
-            // Better handling for 'since' and explicit year ranges like 2015-2019
+            // Handles 'since' and year ranges
             const sinceYearRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
             while ((m = sinceYearRe.exec(lower)) !== null) {
                 const yearMatch = m[0].match(/(19|20)\d{2}/);
@@ -398,13 +249,13 @@
                 }
             }
 
-            // If we found any candidates return the maximum (likely total experience), rounded to one decimal
+            // Returns max candidate rounded to one decimal
             if (candidates.length) {
                 const max = Math.max(...candidates);
                 return Math.round(max * 10) / 10;
             }
 
-            // Fallback: pick the largest bare number followed by 'years' or 'yrs' as before
+            // Fallback: picks largest number before 'years'
             const fallback = [...text.matchAll(/(\d+)\s+years?/gi)].map(m => parseInt(m[1]));
             if (fallback.length) return Math.max(...fallback);
 

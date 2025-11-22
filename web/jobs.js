@@ -1,7 +1,7 @@
 async function loadResume() {
     let data = localStorage.getItem("parsedResume");
 
-    // If not in localStorage, try to load a local `parsed_resume.json` file (useful for testing).
+    // Loads local parsed_resume.json if localStorage is empty
     if (!data) {
         try {
             const resp = await fetch('./parsed_resume.json');
@@ -17,7 +17,7 @@ async function loadResume() {
                 }
             }
         } catch (e) {
-            // ignore fetch errors and fall through to alert below
+            // Ignores fetch errors
             console.warn('No parsed resume in localStorage and failed to fetch parsed_resume.json', e);
         }
     }
@@ -28,15 +28,15 @@ async function loadResume() {
         return;
     }
 
-    // Support two shapes:
-    // 1) Lightweight object saved as `parsedResume` (legacy): { name, email, education, skills: [] }
-    // 2) Parser output with `inputs: [{ ...fields... }]` produced by `index.html` parser
+    // Supports two shapes:
+    // 1) Legacy object: { name, email, education, skills: [] }
+    // 2) Parser output with inputs: [{ ...fields... }]
     let raw = JSON.parse(data);
     let resume = raw;
     if (raw && raw.inputs && Array.isArray(raw.inputs) && raw.inputs.length) {
-        // prefer the first input record
+        // Uses first input record
         resume = raw.inputs[0];
-        // normalize common keys for downstream code
+        // Normalizes keys
         resume.name = resume.full_name || resume.name || "Unknown";
         resume.email = resume.email || resume.contact_email || "";
         resume.education = resume.education_level || resume.education || "Unknown";
@@ -45,7 +45,7 @@ async function loadResume() {
         resume.industries = resume.industries || resume.job_industries || [];
         resume.certifications = resume.certifications || [];
         resume.competitive_score = resume.competitive_score;
-        // ensure skills is an array
+        // Ensures skills is an array
         if (!Array.isArray(resume.skills)) {
             if (typeof resume.skills === 'string' && resume.skills.trim()) {
                 resume.skills = resume.skills.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean);
@@ -53,7 +53,7 @@ async function loadResume() {
                 resume.skills = [];
             }
         }
-        // Normalize skills to canonical names using the same skill dictionary as the parser
+        // Normalizes skills to canonical names
         const skill_dict = {
             "python": ["python", "python3", "cpython", "pypy"],
             "java": ["java", "openjdk", "jdk", "jvm"],
@@ -129,12 +129,12 @@ async function loadResume() {
             const lowered = skillsArr.map(s => String(s).toLowerCase());
             const out = new Set();
             lowered.forEach(s => {
-                // direct canonical match
+                // Direct match
                 if (skill_dict[s]) {
                     out.add(s);
                     return;
                 }
-                // check aliases
+                // Checks aliases
                 for (const canonical in skill_dict) {
                     const aliases = skill_dict[canonical];
                     for (let i = 0; i < aliases.length; i++) {
@@ -144,7 +144,7 @@ async function loadResume() {
                         }
                     }
                 }
-                // fallback: add the original token
+                // Fallback: adds original token
                 if (s) out.add(s);
             });
             return Array.from(out);
@@ -152,7 +152,7 @@ async function loadResume() {
 
         resume.skills = normalizeSkills(resume.skills);
     } else {
-        // normalize the legacy shape
+        // Normalizes legacy shape
         resume.name = resume.name || "Unknown";
         resume.email = resume.email || "";
         resume.education = resume.education || "Unknown";
@@ -163,7 +163,7 @@ async function loadResume() {
 
     window.resumeData = resume;
 
-    // Show a richer resume summary on the jobs page
+    // Shows resume summary
     document.getElementById("resumeSummary").innerHTML = `
     <div><b>Name:</b> ${resume.name}</div>
     <div><b>Email:</b> ${resume.email || 'N/A'}</div>
@@ -177,7 +177,7 @@ async function loadResume() {
     <div><b>Skills:</b> ${(Array.isArray(resume.skills) ? resume.skills.join(', ') : '') || 'None detected'}</div>
   `;
 
-    // Infer job-type insights and render them
+    // Infers job types
     // Infer job-type insights and render them
     try {
         const insights = inferJobTypes(resume);
@@ -186,29 +186,29 @@ async function loadResume() {
         console.warn('Failed to infer job types', e);
     }
 
-    // Fetch jobs from backend
+    // Fetches jobs
     try {
         const response = await fetch("/.netlify/functions/get-jobs");
         if (!response.ok) throw new Error("Failed to load jobs");
         const jobsData = await response.json();
 
         window.jobData = jobsData.map(item => {
-            // Normalize keys to lowercase and handle Supabase/Firestore schema differences
+            // Normalizes keys and handles schema differences
             const o = {};
             if (item && typeof item === 'object' && !Array.isArray(item)) {
                 Object.keys(item).forEach(k => {
                     o[k.trim().toLowerCase()] = item[k];
                 });
 
-                // Ensure job_employment_type is populated if it comes as employment_type
+                // Populates job_employment_type
                 if (!o.job_employment_type && o.employment_type) {
                     o.job_employment_type = o.employment_type;
                 }
-                // Ensure job_seniority_level is populated if it comes as seniority_level
+                // Populates job_seniority_level
                 if (!o.job_seniority_level && o.seniority_level) {
                     o.job_seniority_level = o.seniority_level;
                 }
-                // Ensure job_posted_date is populated if it comes as posted_date
+                // Populates job_posted_date
                 if (!o.job_posted_date && o.posted_date) {
                     o.job_posted_date = o.posted_date;
                 }
@@ -238,7 +238,7 @@ async function loadResume() {
     filterJobs();
 }
 
-// Global skill dictionary reused for matching (keeps parity with parser)
+// Skill dictionary
 const SKILL_DICT = {
     "python": ["python", "python3", "cpython", "pypy"],
     "java": ["java", "openjdk", "jdk", "jvm"],
@@ -344,7 +344,7 @@ function populateFilters() {
     function fill(id, set) {
         const sel = document.getElementById(id);
         if (!sel) return;
-        // remove existing options except the first 'any' option
+        // Removes options except 'any'
         sel.querySelectorAll('option:not([value="any"])').forEach(o => o.remove());
         Array.from(set).sort((a, b) => a.localeCompare(b)).forEach(val => {
             const opt = document.createElement('option');
@@ -372,7 +372,7 @@ function filterJobs() {
     const postedFrom = document.getElementById("postedFrom") ? document.getElementById("postedFrom").value : '';
     const postedTo = document.getElementById("postedTo") ? document.getElementById("postedTo").value : '';
 
-    // Preferred filters set by insights UI (optional)
+    // Preferred filters (optional)
     const preferredRoles = (window.preferredJobRoles || []).map(s => s.toLowerCase());
     const preferredEmployment = (window.preferredEmploymentTypes || []).map(s => s.toLowerCase());
 
@@ -385,12 +385,12 @@ function filterJobs() {
         const jEmployment = (job.job_employment_type || "").toLowerCase();
         const jPosted = job.job_posted_date || job.posted_date || job.posted || "";
 
-        // normalize posted date to YYYY-MM-DD if possible
+        // Normalizes posted date
         let jPostedDate = null;
         if (jPosted) {
             const d = new Date(jPosted);
             if (!isNaN(d)) {
-                // use ISO date string (YYYY-MM-DD)
+                // Uses ISO date
                 jPostedDate = d.toISOString().slice(0, 10);
             }
         }
@@ -402,13 +402,13 @@ function filterJobs() {
         const seniorityMatch = (!seniority || seniority === 'any') ? true : jSeniority.includes(seniority);
         const employmentMatch = (!employment || employment === 'any') ? true : jEmployment.includes(employment);
 
-        // If preferred roles are set, require at least one role to appear in title or industries
+        // Checks preferred roles
         let preferredRoleMatch = true;
         if (preferredRoles.length) {
             preferredRoleMatch = preferredRoles.some(r => jTitle.includes(r) || jIndustries.includes(r));
         }
 
-        // If preferred employment types are set, require job employment to match any
+        // Checks preferred employment types
         let preferredEmploymentMatch = true;
         if (preferredEmployment.length) {
             preferredEmploymentMatch = preferredEmployment.some(e => jEmployment.includes(e));
@@ -433,7 +433,7 @@ function filterJobs() {
 function timeAgo(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
-    if (isNaN(date)) return dateString; // Fallback if not a valid date
+    if (isNaN(date)) return dateString; // Fallback for invalid date
 
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
@@ -480,7 +480,7 @@ function computeMatch(jobs) {
     });
 
     jobs.sort((a, b) => b.match_score - a.match_score);
-    const top = jobs.slice(0, 50); // Limit to 50 as requested
+    const top = jobs.slice(0, 50); // Limits to 50
 
     const jobResults = document.getElementById("jobResults");
     jobResults.innerHTML = top.map(job => {
@@ -491,9 +491,9 @@ function computeMatch(jobs) {
         const seniority = job.job_seniority_level || job.seniority_level || 'N/A';
         const applyLink = job.job_url || job.url || job.apply_link || job.application_link || '#';
 
-        // Handle posted date parsing
+        // Parses posted date
         let postedRaw = job.job_posted_date || job.posted_date || job.posted;
-        // If it's an object with seconds (Firestore style) or just needs standardizing
+        // Handles Firestore timestamp
         if (postedRaw && typeof postedRaw === 'object' && postedRaw.seconds) {
             postedRaw = new Date(postedRaw.seconds * 1000).toISOString();
         }
@@ -501,7 +501,7 @@ function computeMatch(jobs) {
 
         const salary = job.salary || job.pay || job.compensation || job.salary_range || job.pay_range || '';
 
-        // format salary display if object-like (min/max)
+        // Formats salary
         let salaryDisplay = '';
         if (typeof salary === 'string' && salary.trim()) salaryDisplay = salary;
         else if (typeof salary === 'object' && salary !== null) {
@@ -551,23 +551,21 @@ function computeMatch(jobs) {
     `;
     }).join("");
 
-    // initialize apply modal handlers for the newly-rendered buttons
+    // Initializes apply modal
     initApplyModal();
 
     drawChart(top);
 }
 
-/* --------------------
-   Job type inference + UI
-   -------------------- */
+/* Job type inference + UI */
 function inferJobTypes(resume) {
-    // Build a normalized text blob from title, skills and industries
+    // Builds text blob
     const titleText = (resume.title || '').toLowerCase();
     const skillsText = Array.isArray(resume.skills) ? resume.skills.join(' ') : (resume.skills || '');
     const industriesText = Array.isArray(resume.industries) ? resume.industries.join(' ') : (resume.industries || '');
     const allText = (titleText + ' ' + skillsText + ' ' + industriesText).toLowerCase();
 
-    // Define keyword sets per role for better precision
+    // Role keywords
     const roleKeywords = {
         'Software Engineer': ['software', 'engineer', 'developer', 'full stack', 'full-stack', 'backend', 'frontend', 'javascript', 'java', 'c#', 'c++', 'python', 'ruby', 'node', 'react'],
         'Data / ML': ['data scientist', 'data engineer', 'data analyst', 'machine learning', 'ml', 'spark', 'pandas', 'numpy', 'scikit', 'tensorflow', 'pytorch', 'etl', 'big data'],
@@ -580,7 +578,7 @@ function inferJobTypes(resume) {
         'Intern / Entry Level': ['intern', 'internship', 'entry level', 'graduate', 'student']
     };
 
-    // Map industries to suggested roles (soft mapping)
+    // Industry to role mapping
     const industryRoleMap = {
         'software': ['Software Engineer'],
         'technology': ['Software Engineer', 'Data / ML'],
@@ -592,7 +590,7 @@ function inferJobTypes(resume) {
 
     const roles = [];
 
-    // Score each role by counting keyword matches (case-insensitive)
+    // Scores roles by keyword matches
     Object.keys(roleKeywords).forEach(role => {
         const kws = roleKeywords[role];
         let matches = 0;
@@ -601,30 +599,30 @@ function inferJobTypes(resume) {
                 const re = new RegExp(k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
                 if (allText.match(re)) matches += (allText.match(re) || []).length;
             } catch (e) {
-                // if regex creation fails fallback to indexOf
+                // Fallback to indexOf
                 if (allText.indexOf(k.toLowerCase()) !== -1) matches++;
             }
         });
         if (matches > 0) {
-            // confidence: matched keywords / total keywords (capped at 1) scaled to 0-100
+            // Calculates confidence score
             const score = Math.min(100, Math.round((matches / kws.length) * 100));
             roles.push({ name: role, score });
         }
     });
 
-    // Augment roles from industry names when role not present
+    // Adds roles from industry
     if (roles.length === 0 && industriesText) {
         Object.keys(industryRoleMap).forEach(ind => {
             if (industriesText.includes(ind)) {
                 industryRoleMap[ind].forEach(r => {
-                    // add with low confidence (40)
+                    // Adds with low confidence
                     roles.push({ name: r, score: 40 });
                 });
             }
         });
     }
 
-    // Employment types with keyword sets and scoring
+    // Employment types scoring
     const employmentKeywords = {
         'Full-time': ['full time', 'full-time', 'fulltime'],
         'Part-time': ['part time', 'part-time', 'parttime'],
@@ -643,7 +641,7 @@ function inferJobTypes(resume) {
         }
     });
 
-    // Sort roles by confidence desc
+    // Sorts roles
     roles.sort((a, b) => b.score - a.score);
     employment.sort((a, b) => b.score - a.score);
 
@@ -685,7 +683,7 @@ function populateJobTypeInsights(insights) {
 
     container.innerHTML = parts.join('');
 
-    // wire buttons
+    // Wires buttons
     const apply = document.getElementById('applyPreferredBtn');
     const clear = document.getElementById('clearPreferredBtn');
     if (apply) apply.addEventListener('click', () => {
@@ -703,14 +701,14 @@ function populateJobTypeInsights(insights) {
     });
 }
 
-// Simple helper to escape HTML in attributes
+// Escapes HTML
 function escapeHtml(str) {
     return String(str).replace(/[&"'<>]/g, function (s) {
         return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
     });
 }
 
-// Modal handling for Apply confirmation
+// Apply modal handling
 function showApplyModal(link, title, company) {
     const modal = document.getElementById('applyModal');
     if (!modal) return;
@@ -753,7 +751,7 @@ function initApplyModal() {
             try {
                 window.open(link, '_blank', 'noopener');
             } catch (e) {
-                // fallback
+                // Fallback
                 const a = document.createElement('a');
                 a.href = link;
                 a.target = '_blank';

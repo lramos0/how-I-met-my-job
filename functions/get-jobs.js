@@ -8,7 +8,7 @@ exports.handler = async (event, context) => {
     try {
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Query for up to 50 jobs
+        // Gets 50 jobs
         const { data, error } = await supabase
             .from('job_listings')
             .select('*')
