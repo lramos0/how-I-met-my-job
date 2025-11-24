@@ -557,7 +557,7 @@ function computeMatch(jobs) {
     drawChart(top);
 }
 
-/* Job type inference + UI */
+///////////////// Job type inference + UI ////////////////////////////////
 function inferJobTypes(resume) {
     // Builds text blob
     const titleText = (resume.title || '').toLowerCase();

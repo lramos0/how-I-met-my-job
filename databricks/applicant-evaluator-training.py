@@ -16,7 +16,7 @@ import random, datetime
 spark = SparkSession.builder.appName("synthetic_job_matching_profiles_labeled").getOrCreate()
 random.seed(42)
 
-# --- (same vocabularies as before, shortened here for brevity) ---
+# // SAME VOCABULARIES AS BEFORE //
 first_names = ["Avery","Jordan","Taylor","Riley","Casey","Skyler","Alex","Sam","Morgan","Quinn"]
 last_names  = ["Nguyen","Patel","Garcia","Smith","Kim","Chen","Brown","Johnson","Williams","Jones"]
 skills_pool = ["Python","Java","C++","Go","Scala","JavaScript","React","Node.js","Docker","Kubernetes",
@@ -41,7 +41,7 @@ def compute_competitiveness(years, edu, num_skills, num_certs, num_achievements)
     noise = random.uniform(-1, 1)
     return int(max(0, min(10, base / 3 + noise)))
 
-# --- Schema (with competitiveness_score) ---
+# // SCHEMA (WITH COMPETITIVENESS_SCORE) //
 schema = T.StructType([
     T.StructField("candidate_id", T.StringType(), False),
     T.StructField("full_name", T.StringType(), False),
@@ -110,157 +110,7 @@ df.write \
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Pull in generated training data
-# MAGIC
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT * FROM ml_data.candidate_profiles
-
-# COMMAND ----------
-
-from pyspark.sql import functions as F
-
-df_mapped = spark.table("ml_data.candidate_profiles").withColumn(
-    "competitiveness_score",
-    (F.col("competitiveness_score") * 0.1).cast("double")
-)
-
-df_mapped.select("full_name", "competitiveness_score").display()
-
-# 1) See raw schema
-df_mapped.printSchema()
-
-# 2) Peek at distinct raw values as strings
-df_mapped.select("competitiveness_score").distinct().orderBy("competitiveness_score").show(20, truncate=False)
-
-# 3) Check min/max after a clean cast (no labeling yet)
-from pyspark.sql import functions as F
-
-df_debug = (
-    df_mapped
-    .withColumn("score_str", F.col("competitiveness_score").cast("string"))
-    .withColumn("score_num", F.regexp_replace(F.col("score_str"), r"[,%\s]", "").cast("double"))
-)
-
-df_debug.agg(
-    F.count("*").alias("n"),
-    F.count("score_num").alias("n_castable"),
-    F.min("score_num").alias("min_score"),
-    F.max("score_num").alias("max_score")
-).show()
-
-
-# COMMAND ----------
-
-# pyspark 3.x
-from pyspark.sql import functions as F, types as T
-from pyspark.ml import Pipeline
-from pyspark.ml.feature import (
-    StringIndexer, OneHotEncoder, CountVectorizer, VectorAssembler
-)
-from pyspark.ml.classification import LogisticRegression
-from pyspark.ml.evaluation import BinaryClassificationEvaluator
-
-# -----------------------------------------------------------------------------
-# Expects df with these columns (from previous step):
-# ['candidate_id','full_name','location','education_level','years_experience',
-#  'skills','certifications','current_title','industries','achievements',
-#  'competitiveness_score','last_updated']
-# -----------------------------------------------------------------------------
-
-# 1) Define the binary label from competitiveness_score (threshold can be tuned)
-df_labeled = df_mapped.withColumn(
-    "label",
-    F.when(F.col("competitiveness_score") >= F.lit(0.5), F.lit(1.0)).otherwise(F.lit(0.0))
-)
-
-# 2) Split train/test
-fractions = [0.8, 0.2]
-for attempt in range(20):
-    train_df, test_df = df_labeled.randomSplit(fractions, seed=42 + attempt)
-    t_counts = dict(train_df.groupBy("label").count().collect())
-    s_counts = dict(test_df.groupBy("label").count().collect())
-    if 0.0 in t_counts and 1.0 in t_counts and 0.0 in s_counts and 1.0 in s_counts:
-        print(f"Stratification success on attempt {attempt}")
-        break
-else:
-    raise RuntimeError("Could not obtain both classes in both splits after 20 attempts.")
-
-# 3) Feature transformers
-# Array/bag features
-cv_skills = CountVectorizer(
-    inputCol="skills",
-    outputCol="vec_skills",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_certs = CountVectorizer(
-    inputCol="certifications",
-    outputCol="vec_certs",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_industries = CountVectorizer(
-    inputCol="industries",
-    outputCol="vec_industries",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_achievements = CountVectorizer(
-    inputCol="achievements",
-    outputCol="vec_achievements",
-    minDF=20.0,
-    minTF=1.0)
-
-# Categorical features
-idx_edu   = StringIndexer(inputCol="education_level", outputCol="idx_education_level", handleInvalid="keep")
-idx_title = StringIndexer(inputCol="current_title",   outputCol="idx_current_title",   handleInvalid="keep")
-idx_loc   = StringIndexer(inputCol="location",        outputCol="idx_location",        handleInvalid="keep")
-
-ohe = OneHotEncoder(
-    inputCols=["idx_education_level", "idx_current_title", "idx_location"],
-    outputCols=["ohe_education_level", "ohe_current_title", "ohe_location"],
-    handleInvalid="keep"
-)
-
-# Numeric feature(s)
-# years_experience is numeric. Add engineered features if needed.
-assembler = VectorAssembler(
-    inputCols=[
-        "vec_skills", "vec_certs", "vec_industries", "vec_achievements",
-        "ohe_education_level", "ohe_current_title", "ohe_location",
-        "years_experience"
-    ],
-    outputCol="features"
-)
-
-# 4) Classifier
-# Elastic-net logistic regression generally works well on sparse high-dim features
-lr = LogisticRegression(
-    featuresCol="features",
-    labelCol="label",
-    predictionCol="prediction",
-    probabilityCol="probability",
-    rawPredictionCol="rawPrediction",
-    maxIter=10,
-    regParam=0.05,
-    elasticNetParam=0.5
-)
-
-# 5) Pipeline
-pipe = Pipeline(stages=[
-    cv_skills, cv_certs, cv_industries, cv_achievements,
-    idx_edu, idx_title, idx_loc, ohe,
-    assembler, lr
-])
-
-# 6) Train
-model = pipe.fit(train_df)
-spark_model = model 
-# 7) Evaluate (AUC)
+# // EVALUATE (AUC) //
 pred_test = model.transform(test_df)
 
 evaluator_roc = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderROC")
@@ -270,7 +120,7 @@ auc_roc = evaluator_roc.evaluate(pred_test)
 auc_pr  = evaluator_pr.evaluate(pred_test)
 print(f"AUC-ROC: {auc_roc:.3f} | AUC-PR: {auc_pr:.3f}")
 
-# 8) Extract clean probability column in [0,1] for "competitive"
+# // EXTRACT CLEAN PROBABILITY COLUMN //
 get_prob = F.udf(lambda v: float(v[1]), T.DoubleType())
 pred_test = pred_test.withColumn("competitive_prob", get_prob(F.col("probability")))
 
@@ -280,10 +130,10 @@ pred_test.select(
     "education_level", "competitive_prob", "prediction", "label"
 ).orderBy(F.asc("competitive_prob")).show(20, truncate=False)
 
-# 9) (Optional) Save the model for reuse
+# // SAVE MODEL (OPTIONAL) //
 # model.write().overwrite().save("dbfs:/models/competitive_classifier_lr")
 
-# 10) (Optional) Write predictions to a Delta table
+# // WRITE PREDICTIONS (OPTIONAL) //
 # spark.sql("CREATE DATABASE IF NOT EXISTS ml_scoring")
 # pred_test.select("candidate_id","competitive_prob","prediction","label").write \
 #   .format("delta").mode("overwrite").saveAsTable("ml_scoring.candidate_competitiveness_predictions")
@@ -312,213 +162,6 @@ import pandas as pd
 import mlflow, mlflow.pyfunc
 from mlflow.models.signature import infer_signature
 from mlflow.exceptions import MlflowException
-from pyspark.sql import Row
-from pyspark.ml import PipelineModel
-from pyspark.ml.feature import OneHotEncoder, StringIndexerModel, CountVectorizerModel, VectorAssembler
-from pyspark.ml.classification import LogisticRegressionModel
-# ---- CONFIG: edit these 3 names to match UC objects ----
-
-df_mapped = spark.table("ml_data.candidate_profiles").withColumn(
-    "competitiveness_score",
-    (F.col("competitiveness_score") * 0.1).cast("double")
-)
-
-df_mapped.select("full_name", "competitiveness_score").display()
-
-# 1) See raw schema
-df_mapped.printSchema()
-
-# 2) Peek at distinct raw values as strings
-df_mapped.select("competitiveness_score").distinct().orderBy("competitiveness_score").show(20, truncate=False)
-
-# 3) Check min/max after a clean cast (no labeling yet)
-from pyspark.sql import functions as F
-
-df_debug = (
-    df_mapped
-    .withColumn("score_str", F.col("competitiveness_score").cast("string"))
-    .withColumn("score_num", F.regexp_replace(F.col("score_str"), r"[,%\s]", "").cast("double"))
-)
-
-df_debug.agg(
-    F.count("*").alias("n"),
-    F.count("score_num").alias("n_castable"),
-    F.min("score_num").alias("min_score"),
-    F.max("score_num").alias("max_score")
-).show()
-
-
-# COMMAND ----------
-
-# pyspark 3.x
-from pyspark.sql import functions as F, types as T
-from pyspark.ml import Pipeline
-from pyspark.ml.feature import (
-    StringIndexer, OneHotEncoder, CountVectorizer, VectorAssembler
-)
-from pyspark.ml.classification import LogisticRegression
-from pyspark.ml.evaluation import BinaryClassificationEvaluator
-
-# -----------------------------------------------------------------------------
-# Assumes you already have df with these columns (from the previous step):
-# ['candidate_id','full_name','location','education_level','years_experience',
-#  'skills','certifications','current_title','industries','achievements',
-#  'competitiveness_score','last_updated']
-# -----------------------------------------------------------------------------
-
-# 1) Define the binary label from competitiveness_score (threshold can be tuned)
-df_labeled = df_mapped.withColumn(
-    "label",
-    F.when(F.col("competitiveness_score") >= F.lit(0.5), F.lit(1.0)).otherwise(F.lit(0.0))
-)
-
-# 2) Split train/test
-fractions = [0.8, 0.2]
-for attempt in range(20):
-    train_df, test_df = df_labeled.randomSplit(fractions, seed=42 + attempt)
-    t_counts = dict(train_df.groupBy("label").count().collect())
-    s_counts = dict(test_df.groupBy("label").count().collect())
-    if 0.0 in t_counts and 1.0 in t_counts and 0.0 in s_counts and 1.0 in s_counts:
-        print(f"Stratification success on attempt {attempt}")
-        break
-else:
-    raise RuntimeError("Could not obtain both classes in both splits after 20 attempts.")
-
-# 3) Feature transformers
-# Array/bag features
-cv_skills = CountVectorizer(
-    inputCol="skills",
-    outputCol="vec_skills",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_certs = CountVectorizer(
-    inputCol="certifications",
-    outputCol="vec_certs",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_industries = CountVectorizer(
-    inputCol="industries",
-    outputCol="vec_industries",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_achievements = CountVectorizer(
-    inputCol="achievements",
-    outputCol="vec_achievements",
-    minDF=20.0,
-    minTF=1.0)
-
-# Categorical features
-idx_edu   = StringIndexer(inputCol="education_level", outputCol="idx_education_level", handleInvalid="keep")
-idx_title = StringIndexer(inputCol="current_title",   outputCol="idx_current_title",   handleInvalid="keep")
-idx_loc   = StringIndexer(inputCol="location",        outputCol="idx_location",        handleInvalid="keep")
-
-ohe = OneHotEncoder(
-    inputCols=["idx_education_level", "idx_current_title", "idx_location"],
-    outputCols=["ohe_education_level", "ohe_current_title", "ohe_location"],
-    handleInvalid="keep"
-)
-
-# Numeric feature(s)
-# years_experience is already numeric; you can add engineered features if desired
-assembler = VectorAssembler(
-    inputCols=[
-        "vec_skills", "vec_certs", "vec_industries", "vec_achievements",
-        "ohe_education_level", "ohe_current_title", "ohe_location",
-        "years_experience"
-    ],
-    outputCol="features"
-)
-
-# 4) Classifier
-# Elastic-net logistic regression generally works well on sparse high-dim features
-lr = LogisticRegression(
-    featuresCol="features",
-    labelCol="label",
-    predictionCol="prediction",
-    probabilityCol="probability",
-    rawPredictionCol="rawPrediction",
-    maxIter=10,
-    regParam=0.05,
-    elasticNetParam=0.5
-)
-
-# 5) Pipeline
-pipe = Pipeline(stages=[
-    cv_skills, cv_certs, cv_industries, cv_achievements,
-    idx_edu, idx_title, idx_loc, ohe,
-    assembler, lr
-])
-
-# 6) Train
-model = pipe.fit(train_df)
-spark_model = model 
-# 7) Evaluate (AUC)
-pred_test = model.transform(test_df)
-
-evaluator_roc = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderROC")
-evaluator_pr  = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderPR")
-
-auc_roc = evaluator_roc.evaluate(pred_test)
-auc_pr  = evaluator_pr.evaluate(pred_test)
-print(f"AUC-ROC: {auc_roc:.3f} | AUC-PR: {auc_pr:.3f}")
-
-# 8) Extract clean probability column in [0,1] for "competitive"
-get_prob = F.udf(lambda v: float(v[1]), T.DoubleType())
-pred_test = pred_test.withColumn("competitive_prob", get_prob(F.col("probability")))
-
-# Preview predictions
-pred_test.select(
-    "candidate_id", "full_name", "current_title", "years_experience",
-    "education_level", "competitive_prob", "prediction", "label"
-).orderBy(F.asc("competitive_prob")).show(20, truncate=False)
-
-# 9) (Optional) Save the model for reuse
-# model.write().overwrite().save("dbfs:/models/competitive_classifier_lr")
-
-# 10) (Optional) Write predictions to a Delta table
-# spark.sql("CREATE DATABASE IF NOT EXISTS ml_scoring")
-# pred_test.select("candidate_id","competitive_prob","prediction","label").write \
-#   .format("delta").mode("overwrite").saveAsTable("ml_scoring.candidate_competitiveness_predictions")
-
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Log Model to model registry
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC CREATE CATALOG IF NOT EXISTS ml;
-# MAGIC CREATE SCHEMA IF NOT EXISTS ml.talent_artifacts;
-# MAGIC CREATE VOLUME IF NOT EXISTS ml.talent_artifacts.mlflow_runs;
-# MAGIC CREATE VOLUME IF NOT EXISTS ml.talent_artifacts.code;
-
-# COMMAND ----------
-
-# =========================
-# OPTION 1: Use schema metadata to get exact expanded feature names
-# =========================
-import os, textwrap
-import pandas as pd
-import mlflow, mlflow.pyfunc
-from mlflow.models.signature import infer_signature
-from mlflow.exceptions import MlflowException
-from pyspark.sql import Row
-from pyspark.ml import PipelineModel
-from pyspark.ml.feature import OneHotEncoder, StringIndexerModel, CountVectorizerModel, VectorAssembler
-from pyspark.ml.classification import LogisticRegressionModel
-# ---- CONFIG: edit these 3 names to match your UC objects ----
-CATALOG = "ml"
-SCHEMA  = "talent_artifacts"
-VOLUME_MODELS_DIR = f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/models"
-VOLUME_ARTIFACT_ROOT = f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/models/mlflow_runs"
-
-# Get current user's email/username dynamically
-current_user = dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply('user')
 WORKSPACE_USER_DIR = f"/Workspace/Users/{current_user}"
 CODE_DIR = f"{WORKSPACE_USER_DIR}"
 
@@ -532,7 +175,7 @@ print("nnz coeffs:", sum(1 for x in lrm.coefficients.toArray() if x != 0.0))
 print("first 10 coeffs:", lrm.coefficients.toArray()[:10])
 
 
-# ---- Discover key stages from the fitted pipeline
+# // DISCOVER KEY STAGES FROM THE FITTED PIPELINE //
 ohe_models, indexer_labels, cv_models = {}, {}, {}
 assembler, lr_model = None, None
 
@@ -553,7 +196,7 @@ assert assembler is not None, "VectorAssembler not found in pipeline."
 assert lr_model is not None, "LogisticRegressionModel not found in pipeline."
 
 print(lr_model)
-# -------- Build a realistic RAW input example (these are the raw fields the endpoint accepts)
+# // BUILD A REALISTIC RAW INPUT EXAMPLE //
 example_pd = pd.DataFrame({
     "candidate_id": ["CAND-2025"],
     "full_name": ["Avery Patel"],
@@ -567,7 +210,7 @@ example_pd = pd.DataFrame({
     "achievements": [["Open source contributor"]]
 })
 
-# -------- Use SCHEMA METADATA on the assembler output to get exact per-dimension names
+# // USE SCHEMA METADATA ON THE ASSEMBLER OUTPUT //
 probe_row = Row(
     candidate_id="CAND-2025",
     full_name="Avery Patel",
