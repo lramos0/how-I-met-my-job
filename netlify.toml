@@ -1,0 +1,6 @@
+[build]
+  publish = "web"
+  functions = "functions"
+ 
+# Optional: specify build command
+# Dashboard is static (no build required)

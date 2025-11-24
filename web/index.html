@@ -1,284 +1,302 @@
-<!DOCTYPE html>
-<html lang="en">
 <head>
-    <meta charset="UTF-8">
     <title>📄 Resume Parser Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
-<div class="container py-5">
-    <h2 class="text-center fw-bold mb-4">📄 Resume Parser Dashboard</h2>
+    <div class="container py-5">
+        <h2 class="text-center fw-bold mb-4">📄 Resume Parser Dashboard</h2>
 
-    <!-- Upload Section -->
-    <div class="card p-4 shadow-sm mb-4">
-        <h5 class="fw-bold mb-3">Upload Your Resume</h5>
-        <input type="file" id="resumeFile" class="form-control mb-3" accept=".pdf,.docx,.txt">
-        <button class="btn btn-primary" onclick="parseResume()">🚀 Parse Resume</button>
-        <p id="statusMsg" class="mt-3 text-muted"></p>
-    </div>
+        <!-- Upload Section -->
+        <div class="card p-4 shadow-sm mb-4">
+            <h5 class="fw-bold mb-3">Upload Your Resume</h5>
+            <input type="file" id="resumeFile" class="form-control mb-3" accept=".pdf,.docx,.txt">
+            <button class="btn btn-primary" onclick="parseResume()">🚀 Parse Resume</button>
+            <p id="statusMsg" class="mt-3 text-muted"></p>
+        </div>
 
-    <!-- Preview Section -->
-    <div id="previewSection" class="card p-4 shadow-sm d-none">
-        <h5 class="fw-bold mb-3">🧾 Resume Preview</h5>
+        <!-- Preview Section -->
+        <div id="previewSection" class="card p-4 shadow-sm d-none">
+            <h5 class="fw-bold mb-3">🧾 Resume Preview</h5>
 
-        <div id="backendOutput" class="mb-4 p-3 border rounded bg-white"></div>
-        <div id="parsedOutput" class="bg-light p-3 border rounded small"></div>
+            <div id="backendOutput" class="mb-4 p-3 border rounded bg-white"></div>
+            <div id="parsedOutput" class="bg-light p-3 border rounded small"></div>
 
-        <div class="text-end mt-4">
-            <button class="btn btn-success me-2" onclick="downloadJSON()">💾 Download JSON</button>
-            <button class="btn btn-primary" onclick="goToJobsPage()">➡️ Continue to Job Matching</button>
+            <div class="text-end mt-4">
+                <button class="btn btn-success me-2" onclick="downloadJSON()">💾 Download JSON</button>
+                <button class="btn btn-primary" onclick="goToJobsPage()">➡️ Continue to Job Matching</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- PDF.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
-<script>
-/* --------------------------------------------------------
-   PDF TEXT EXTRACTION
---------------------------------------------------------- */
-async function extractPdfText(file) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    <script>
+        /* --------------------------------------------------------
+           PDF TEXT EXTRACTION
+        --------------------------------------------------------- */
+        async function extractPdfText(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-    let finalText = "";
+            let finalText = "";
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
 
-        let pageText = "";
-        let lastY = null;
+                let pageText = "";
+                let lastY = null;
 
-        for (const item of textContent.items) {
-            const text = item.str;
+                for (const item of textContent.items) {
+                    const text = item.str;
 
-            // detect line breaks using vertical movement
-            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
-                pageText += "\n";
+                    // Detects line breaks with vertical movement
+                    if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+                        pageText += "\n";
+                    }
+
+                    pageText += text;
+                    lastY = item.transform[5];
+                }
+
+                finalText += pageText + "\n\n";
             }
 
-            pageText += text;
-            lastY = item.transform[5];
+            status.textContent = "✅ Resume parsed!";
         }
 
-        finalText += pageText + "\n\n";
-    }
+        /* --------------------------------------------------------
+           DISPLAY PARSED RESUME
+        --------------------------------------------------------- */
+        function displayParsedResume() {
+            const rec = resumeJSON.inputs[0];
 
-    // Clean up weird double-spacing PDF.js often leaves
-    finalText = finalText
-        .replace(/\s{2,}/g, " ")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-
-    return finalText;
-}
-
-
-/* --------------------------------------------------------
-   FIX SMASHED WORDS
---------------------------------------------------------- */
-function restoreWordBoundaries(text) {
-    return text
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
-        .replace(/(\D)(\d)/g, "$1 $2")
-        .replace(/(\d)(\D)/g, "$1 $2")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-}
-
-/* --------------------------------------------------------
-   SEND JSON → BACKEND
---------------------------------------------------------- */
-async function sendJSON(bodyObj) {
-    try {
-        const response = await fetch("/.netlify/functions/classify-cv", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(bodyObj)
-        });
-
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch {
-            console.error("Backend returned non-JSON:", text);
-            return null;
+            document.getElementById("parsedOutput").innerHTML = `
+            <b>Name:</b> ${rec.full_name}<br>
+            <b>Location:</b> ${rec.location}<br>
+            <b>Education:</b> ${rec.education_level}<br>
+            <b>Years Experience:</b> ${rec.years_experience}<br>
+            <b>Title:</b> ${rec.current_title}<br>
+            <b>Skills:</b> ${rec.skills.join(", ") || "None detected"}<br>
+            <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
+            <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
+            <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}<br>
+            <b>Competitive Score:</b> ${rec.competitive_score !== undefined ? rec.competitive_score : "N/A"}
+        `;
         }
-    } catch (e) {
-        console.error("Backend error:", e);
-        return null;
-    }
-}
 
-let resumeJSON = null;
+        /* --------------------------------------------------------
+           FIELD EXTRACTORS
+        --------------------------------------------------------- */
+        function extractName(text) {
+            // Looks for "Firstname Lastname" or "First M. Last"
+            const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.{1}\s+)?([A-Z][a-z]+)\b/);
+            return match ? `${match[1]} ${match[2]}` : "Unknown";
+        }
 
-/* --------------------------------------------------------
-   MAIN PARSER
---------------------------------------------------------- */
-async function parseResume() {
-    const fileInput = document.getElementById("resumeFile");
-    const status = document.getElementById("statusMsg");
+        function extractLocation(text) {
+            const match = text.match(/[A-Z][a-z]+,\s?[A-Z]{2}\b/);
+            return match ? match[0] : "Unknown";
+        }
 
-    if (!fileInput.files.length) {
-        alert("Please upload a resume file first.");
-        return;
-    }
+        function extractEducation(text) {
+            if (/master|m\.?s\.?\b/i.test(text)) return "Master";
+            if (/bachelor|b\.?s\.?\b/i.test(text)) return "Bachelor";
+            if (/ph\.?d|doctor/i.test(text)) return "PhD";
+            return "Unknown";
+        }
 
-    const file = fileInput.files[0];
-    status.textContent = `📄 Extracting text from ${file.name}…`;
+        function extractSkills(text) {
+            // Skill dictionary (canonical -> aliases)
+            const skill_dict = {
+                "python": ["python", "python3", "cpython", "pypy"],
+                "java": ["java", "openjdk", "jdk", "jvm"],
+                "javascript": ["javascript", "js", "nodejs", "ecmascript"],
+                "typescript": ["typescript", "ts"],
+                "go": ["go", "golang"],
+                "c": ["c"],
+                "c++": ["c++", "cpp"],
+                "c#": ["c#", "csharp"],
+                "ruby": ["ruby", "ruby on rails", "rails"],
+                "php": ["php", "laravel", "symfony"],
+                "rust": ["rust"],
+                "kotlin": ["kotlin"],
+                "scala": ["scala"],
+                "r": ["r", "r language"],
+                "swift": ["swift"],
+                "shell": ["shell", "bash", "zsh", "sh"],
+                "perl": ["perl"],
+                "sql": ["sql", "mysql", "postgresql", "oracle", "sqlite", "mssql"],
+                "nosql": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
+                "big data": ["big data", "hadoop", "spark", "mapreduce", "hive", "pig"],
+                "data engineering": ["data engineering", "etl", "data pipeline", "airflow"],
+                "data science": ["data science", "machine learning", "ml", "statistics"],
+                "deep learning": ["deep learning", "neural networks", "tensorflow", "pytorch", "keras"],
+                "mlops": ["mlops", "model deployment", "model serving", "sagemaker", "mlflow"],
+                "nlp": ["nlp", "natural language processing", "transformers", "spacy", "nltk"],
+                "computer vision": ["computer vision", "cv", "opencv"],
+                "analytics": ["analytics", "business intelligence", "bi", "tableau", "power bi"],
+                "rest": ["rest", "restful api", "api", "web api"],
+                "graphql": ["graphql"],
+                "web frameworks": ["django", "flask", "express", "spring", "rails", "fastapi"],
+                "frontend frameworks": ["react", "angular", "vue", "svelte", "ember"],
+                "html": ["html", "html5"],
+                "css": ["css", "css3", "scss", "sass", "less"],
+                "webpack": ["webpack", "rollup", "parcel"],
+                "microservices": ["microservices", "service oriented architecture", "soa"],
+                "devops": ["devops", "ci/cd", "continuous integration", "continuous delivery", "continuous deployment"],
+                "docker": ["docker", "containers"],
+                "kubernetes": ["kubernetes", "k8s", "kube"],
+                "terraform": ["terraform"],
+                "ansible": ["ansible"],
+                "chef": ["chef"],
+                "puppet": ["puppet"],
+                "helm": ["helm"],
+                "istio": ["istio", "service mesh"],
+                "prometheus": ["prometheus", "grafana", "monitoring"],
+                "logging": ["elk", "elasticsearch", "logstash", "kibana", "splunk"],
+                "cloud aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "cloudformation", "iam", "dynamodb"],
+                "cloud azure": ["azure", "microsoft azure", "azure functions", "azure devops", "arm templates"],
+                "cloud gcp": ["gcp", "google cloud", "google cloud platform", "gce", "bigquery", "cloud functions"],
+                "openstack": ["openstack"],
+                "serverless": ["serverless", "faas"],
+                "edge computing": ["edge computing"],
+                "networking": ["networking", "dns", "http", "tcp/ip"],
+                "security": ["security", "kubernetes security", "oauth2", "jwt", "tls", "ssl", "vault"],
+                "git": ["git", "gitlab", "github", "bitbucket"],
+                "ci tools": ["jenkins", "circleci", "travis ci", "github actions", "gitlab ci", "azure pipelines"],
+                "jira": ["jira", "confluence"],
+                "slack": ["slack"],
+                "docker-compose": ["docker-compose", "compose"],
+                "testing": ["testing", "unit test", "integration test", "pytest", "junit", "mocha", "jest"],
+                "performance": ["performance", "profiling", "benchmark"],
+                "cache": ["cache", "redis", "memcached"],
+                "microservices architecture": ["microservices architecture", "soa", "service mesh"],
+                "design patterns": ["design patterns", "solid", "ddd", "clean architecture"],
+                "architecture": ["architecture", "system design", "scalability", "high availability"],
+                "agile": ["agile", "scrum", "kanban"],
+                "devsecops": ["devsecops", "security as code", "shift left"],
+                "observability": ["observability", "opentelemetry", "logging", "tracing", "metrics"]
+            };
 
-    let resumeText = file.name.endsWith(".pdf")
-        ? await extractPdfText(file)
-        : await file.text();
+            const lower = text.toLowerCase();
+            const found = [];
 
-    resumeText = restoreWordBoundaries(resumeText);
-    console.log("Restored Resume Text:", resumeText);
+            // Checks aliases for each skill
+            for (const canonical in skill_dict) {
+                const aliases = skill_dict[canonical];
+                for (let i = 0; i < aliases.length; i++) {
+                    const a = aliases[i];
+                    if (!a) continue;
+                    if (lower.indexOf(a) !== -1) {
+                        found.push(canonical);
+                        break;
+                    }
+                }
+            }
 
-    status.textContent = "🤖 Parsing resume…";
+            // Removes duplicates
+            return Array.from(new Set(found));
+        }
 
-    resumeJSON = {
-        inputs: [{
-            candidate_id: "CAND-" + Date.now(),
-            full_name: extractName(resumeText),
-            location: extractLocation(resumeText),
-            education_level: extractEducation(resumeText),
-            years_experience: estimateYears(resumeText),
-            skills: extractSkills(resumeText),
-            certifications: extractCerts(resumeText),
-            current_title: extractTitle(resumeText),
-            industries: extractIndustries(resumeText),
-            achievements: extractAchievements(resumeText)
-        }],
-        password: "craig123"
-    };
+        function extractCerts(text) {
+            const certs = [];
+            if (/aws solutions architect/i.test(text)) certs.push("AWS Solutions Architect");
+            // 3) Simple years: "5 years" or "5+ years" or "5 yrs"
+            const yearsRe = /([0-9]+(?:\.[0-9]+)?)\s*\+?\s*(?:years?|yrs?)\b/gi;
+            while ((m = yearsRe.exec(lower)) !== null) {
+                const yrs = parseFloat(m[1]);
+                if (!isNaN(yrs)) candidates.push(yrs);
+            }
 
-    status.textContent = "📡 Sending to backend…";
+            // 4) Months-only mentions (convert to years)
+            const monthsRe = /([0-9]+)\s*(?:months?|mos?)\b/gi;
+            while ((m = monthsRe.exec(lower)) !== null) {
+                const mos = parseInt(m[1]);
+                if (!isNaN(mos)) candidates.push(mos / 12);
+            }
 
-    const response = await sendJSON(resumeJSON);
-    console.log("Backend response:", response);
+            // 5) "since 2015" (assumes continuous employment)
+            const sinceRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
+            while ((m = sinceRe.exec(lower)) !== null) {
+                const year = parseInt(m[1] + m[0].slice(m[1].length + 6, m[0].length).match(/\d{2}/));
+                // Fallback logic
+            }
 
-    if (response && Array.isArray(response.predictions) && response.predictions.length > 0) {
-      const prediction = response.predictions[0];
-      resumeJSON.inputs[0].competitive_score = prediction.competitive_score;
-    }
+            // Handles 'since' and year ranges
+            const sinceYearRe = /since\s+(?:[a-z]{3,10}\s+)?(19|20)\d{2}\b/gi;
+            while ((m = sinceYearRe.exec(lower)) !== null) {
+                const yearMatch = m[0].match(/(19|20)\d{2}/);
+                if (yearMatch) {
+                    const y = parseInt(yearMatch[0]);
+                    if (!isNaN(y) && y <= currentYear) candidates.push(currentYear - y);
+                }
+            }
 
-    // Now show the preview *after* you've set the score
-    document.getElementById("previewSection").classList.remove("d-none");
-    displayParsedResume();
+            const yearRangeRe = /(19|20)\d{2}\s*[–-]\s*(?:present|now|(19|20)\d{2})/gi;
+            while ((m = yearRangeRe.exec(lower)) !== null) {
+                const parts = m[0].split(/[-–]/).map(p => p.trim());
+                const startMatch = parts[0].match(/(19|20)\d{2}/);
+                const endMatch = parts[1].match(/(19|20)\d{2}/);
+                if (startMatch) {
+                    const start = parseInt(startMatch[0]);
+                    let end = currentYear;
+                    if (endMatch) end = parseInt(endMatch[0]);
+                    if (!isNaN(start) && !isNaN(end) && end >= start) candidates.push(end - start);
+                }
+            }
 
-    status.textContent = "✅ Resume parsed!";
-}
+            // Returns max candidate rounded to one decimal
+            if (candidates.length) {
+                const max = Math.max(...candidates);
+                return Math.round(max * 10) / 10;
+            }
 
-/* --------------------------------------------------------
-   DISPLAY PARSED RESUME
---------------------------------------------------------- */
-function displayParsedResume() {
-    const rec = resumeJSON.inputs[0];
+            // Fallback: picks largest number before 'years'
+            const fallback = [...text.matchAll(/(\d+)\s+years?/gi)].map(m => parseInt(m[1]));
+            if (fallback.length) return Math.max(...fallback);
 
-    document.getElementById("parsedOutput").innerHTML = `
-        <b>Name:</b> ${rec.full_name}<br>
-        <b>Location:</b> ${rec.location}<br>
-        <b>Education:</b> ${rec.education_level}<br>
-        <b>Years Experience:</b> ${rec.years_experience}<br>
-        <b>Title:</b> ${rec.current_title}<br>
-        <b>Skills:</b> ${rec.skills.join(", ") || "None detected"}<br>
-        <b>Certifications:</b> ${rec.certifications.join(", ") || "None"}<br>
-        <b>Industries:</b> ${rec.industries.join(", ") || "Unknown"}<br>
-        <b>Achievements:</b> ${rec.achievements.join(", ") || "None"}<br>
-        <b>Competitive Score:</b> ${rec.competitive_score !== undefined ? rec.competitive_score : "N/A"}
-    `;
-}
+            return 0;
+        }
 
-/* --------------------------------------------------------
-   FIELD EXTRACTORS
---------------------------------------------------------- */
-function extractName(text) {
-    // Stronger: looks for "Firstname Lastname" OR "First M. Last"
-    const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.\s+)?([A-Z][a-z]+)\b/);
-    return match ? `${match[1]} ${match[2]}` : "Unknown";
-}
+        function extractIndustries(text) {
+            const industries = [];
+            if (/education|teacher|child|school/i.test(text)) industries.push("Education");
+            if (/software|developer/i.test(text)) industries.push("Software");
+            if (/health|care/i.test(text)) industries.push("Healthcare");
+            return industries;
+        }
 
-function extractLocation(text) {
-    const match = text.match(/[A-Z][a-z]+,\s?[A-Z]{2}\b/);
-    return match ? match[0] : "Unknown";
-}
+        function extractAchievements(text) {
+            const achievements = [];
+            if (/dean('|’)s list/i.test(text)) achievements.push("Dean's List");
+            if (/chancellor('|’)s list/i.test(text)) achievements.push("Chancellor's List");
+            return achievements;
+        }
 
-function extractEducation(text) {
-    if (/master|m\.?s\.?\b/i.test(text)) return "Master";
-    if (/bachelor|b\.?s\.?\b/i.test(text)) return "Bachelor";
-    if (/ph\.?d|doctor/i.test(text)) return "PhD";
-    return "Unknown";
-}
+        /* --------------------------------------------------------
+           DOWNLOAD + NAVIGATION
+        --------------------------------------------------------- */
+        function downloadJSON() {
+            const blob = new Blob([JSON.stringify(resumeJSON, null, 2)], {
+                type: "application/json"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "parsed_resume.json";
+            a.click();
+        }
 
-function extractSkills(text) {
-    const skills = ["python","java","javascript","spark","tensorflow","aws","docker"];
-    return skills.filter(s => text.toLowerCase().includes(s));
-}
-
-function extractCerts(text) {
-    const certs = [];
-    if (/aws solutions architect/i.test(text)) certs.push("AWS Solutions Architect");
-    if (/pmp/i.test(text)) certs.push("PMP");
-    return certs;
-}
-
-function extractTitle(text) {
-    const roles = [
-        "Software Engineer","ML Engineer","Data Scientist","Developer",
-        "Teacher","Counselor","Supervisor","Specialist"
-    ];
-    for (let r of roles) {
-        const regex = new RegExp(r, "i");
-        if (regex.test(text)) return r;
-    }
-    return "Unknown";
-}
-
-function estimateYears(text) {
-    const matches = [...text.matchAll(/(\d+)\s+years?/gi)];
-    return matches.length ? Math.max(...matches.map(m => parseInt(m[1]))) : 0;
-}
-
-function extractIndustries(text) {
-    const industries = [];
-    if (/education|teacher|child|school/i.test(text)) industries.push("Education");
-    if (/software|developer/i.test(text)) industries.push("Software");
-    if (/health|care/i.test(text)) industries.push("Healthcare");
-    return industries;
-}
-
-function extractAchievements(text) {
-    const achievements = [];
-    if (/dean('|’)s list/i.test(text)) achievements.push("Dean's List");
-    if (/chancellor('|’)s list/i.test(text)) achievements.push("Chancellor's List");
-    return achievements;
-}
-
-/* --------------------------------------------------------
-   DOWNLOAD + NAVIGATION
---------------------------------------------------------- */
-function downloadJSON() {
-    const blob = new Blob([JSON.stringify(resumeJSON, null, 2)], {
-        type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "parsed_resume.json";
-    a.click();
-}
-
-function goToJobsPage() {
-    localStorage.setItem("parsedResume", JSON.stringify(resumeJSON));
-    window.location.href = "jobs.html";
-}
-</script>
+        function goToJobsPage() {
+            localStorage.setItem("parsedResume", JSON.stringify(resumeJSON));
+            window.location.href = "jobs.html";
+        }
+    </script>
 </body>
+
+
 </html>
-
-

@@ -4,7 +4,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade "mlflow-skinny[databricks]"
+# MAGIC %pip install --upgrade "mlflow-skinny[databricks]" databricks-sdk
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -15,7 +15,7 @@ import random, datetime
 
 random.seed(42)
 
-# --- Vocabularies for job listings ---
+# // VOCABULARIES FOR JOB LISTINGS //
 job_titles = [
     "Software Engineer", "Data Scientist", "ML Engineer", "Product Manager", "UX Designer",
     "DevOps Engineer", "QA Engineer", "Business Analyst", "Cloud Architect", "Security Engineer"
@@ -47,7 +47,7 @@ def compute_listing_competitiveness(salary, num_skills, num_certs, exp_level, in
     noise = random.uniform(-1, 1)
     return int(max(0, min(10, base / 3 + noise)))
 
-# --- Schema for job listings (with competitiveness_score) ---
+# // SCHEMA FOR JOB LISTINGS //
 schema = T.StructType([
     T.StructField("job_id", T.StringType(), False),
     T.StructField("job_title", T.StringType(), False),
@@ -118,53 +118,7 @@ df.write \
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Pull in generated training data
-# MAGIC
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT * FROM ml_data.job_listings
-
-# COMMAND ----------
-
 from pyspark.sql import functions as F
-
-df_mapped = spark.table("ml_data.job_listings").withColumn(
-    "competitiveness_score",
-    (F.col("competitiveness_score") * 0.1).cast("double")
-)
-
-df_mapped.select("job_id", "company", "competitiveness_score").display()
-
-# 1) See raw schema
-df_mapped.printSchema()
-
-# 2) Peek at distinct raw values as strings
-df_mapped.select("competitiveness_score").distinct().orderBy("competitiveness_score").show(20, truncate=False)
-
-# 3) Check min/max after a clean cast (no labeling yet)
-from pyspark.sql import functions as F
-
-df_debug = (
-    df_mapped
-    .withColumn("score_str", F.col("competitiveness_score").cast("string"))
-    .withColumn("score_num", F.regexp_replace(F.col("score_str"), r"[,%\s]", "").cast("double"))
-)
-
-df_debug.agg(
-    F.count("*").alias("n"),
-    F.count("score_num").alias("n_castable"),
-    F.min("score_num").alias("min_score"),
-    F.max("score_num").alias("max_score")
-).show()
-
-
-# COMMAND ----------
-
-# pyspark 3.x
-from pyspark.sql import functions as F, types as T
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import (
     StringIndexer, OneHotEncoder, CountVectorizer, VectorAssembler
@@ -172,20 +126,32 @@ from pyspark.ml.feature import (
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
-# -----------------------------------------------------------------------------
-# Assumes you already have df with these columns (from the previous step):
-# ['job_id','job_title','company','location','industry','employment_type',
-#  'experience_level','required_skills','required_certifications','salary_usd',
-#  'posting_date','competitiveness_score']
-# -----------------------------------------------------------------------------
+# 1) Map score to double
+df_mapped = spark.table("ml_data.job_listings").withColumn(
+    "competitiveness_score",
+    (F.col("competitiveness_score") * 0.1).cast("double")
+)
 
-# 1) Define the binary label from competitiveness_score (threshold can be tuned)
+# 2) Debug check
+df_debug = (
+    df_mapped
+    .withColumn("score_str", F.col("competitiveness_score").cast("string"))
+    .withColumn("score_num", F.regexp_replace(F.col("score_str"), r"[,%\s]", "").cast("double"))
+)
+df_debug.agg(
+    F.count("*").alias("n"),
+    F.count("score_num").alias("n_castable"),
+    F.min("score_num").alias("min_score"),
+    F.max("score_num").alias("max_score")
+).show()
+
+# 3) Define binary label
 df_labeled = df_mapped.withColumn(
     "label",
     F.when(F.col("competitiveness_score") >= F.lit(0.5), F.lit(1.0)).otherwise(F.lit(0.0))
 )
 
-# 2) Split train/test
+# 4) Split train/test
 fractions = [0.8, 0.2]
 for attempt in range(20):
     train_df, test_df = df_labeled.randomSplit(fractions, seed=42 + attempt)
@@ -197,13 +163,12 @@ for attempt in range(20):
 else:
     raise RuntimeError("Could not obtain both classes in both splits after 20 attempts.")
 
-# 3) Feature transformers
-# Array/bag features
+# 5) Feature Transformers
 # Increase minDF to reduce vocabulary size for CountVectorizer
 cv_skills = CountVectorizer(
     inputCol="required_skills",
     outputCol="vec_skills",
-    minDF=50.0,  # Increased from 20.0 to 50.0
+    minDF=50.0,
     minTF=1.0
 )
 cv_certs = CountVectorizer(
@@ -236,7 +201,7 @@ assembler = VectorAssembler(
     outputCol="features"
 )
 
-# 4) Classifier
+# // CLASSIFIER //
 lr = LogisticRegression(
     featuresCol="features",
     labelCol="label",
@@ -248,17 +213,17 @@ lr = LogisticRegression(
     elasticNetParam=0.5
 )
 
-# 5) Pipeline
+# // PIPELINE //
 pipe = Pipeline(stages=[
     cv_skills, cv_certs, idx_industry,
     idx_title, idx_exp, ohe,
     assembler, lr
 ])
 
-# 6) Train
+# // TRAIN //
 model = pipe.fit(train_df)
 spark_model = model 
-# 7) Evaluate (AUC)
+# // EVALUATE (AUC) //
 pred_test = model.transform(test_df)
 
 evaluator_roc = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderROC")
@@ -268,7 +233,7 @@ auc_roc = evaluator_roc.evaluate(pred_test)
 auc_pr  = evaluator_pr.evaluate(pred_test)
 print(f"AUC-ROC: {auc_roc:.3f} | AUC-PR: {auc_pr:.3f}")
 
-# 8) Extract clean probability column in [0,1] for "competitive"
+# // EXTRACT CLEAN PROBABILITY COLUMN //
 get_prob = F.udf(lambda v: float(v[1]), T.DoubleType())
 pred_test = pred_test.withColumn("competitive_prob", get_prob(F.col("probability")))
 
@@ -277,14 +242,6 @@ pred_test.select(
     "job_id", "job_title", "company", "location", "salary_usd",
     "competitive_prob", "prediction", "label"
 ).orderBy(F.asc("competitive_prob")).show(20, truncate=False)
-
-# 9) (Optional) Save the model for reuse
-# model.write().overwrite().save("dbfs:/models/job_listings_classifier_lr")
-
-# 10) (Optional) Write predictions to a Delta table
-# spark.sql("CREATE DATABASE IF NOT EXISTS ml_scoring")
-# pred_test.select("job_id","competitive_prob","prediction","label").write \
-#   .format("delta").mode("overwrite").saveAsTable("ml_scoring.job_listings_competitiveness_predictions")
 
 # COMMAND ----------
 
@@ -320,10 +277,12 @@ SCHEMA  = "job_artifacts"
 VOLUME_MODELS_DIR = f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/models"
 VOLUME_ARTIFACT_ROOT = f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/models/mlflow_runs"
 
-WORKSPACE_USER_DIR = "/Workspace/Users/loganramos00@gmail.com"
+# Get current user's email/username dynamically
+current_user = dbutils.notebook.entry_point.getDbutils().notebook().getContext().tags().apply('user')
+WORKSPACE_USER_DIR = f"/Workspace/Users/{current_user}"
 CODE_DIR = f"{WORKSPACE_USER_DIR}"
 
-fitted_pipeline = spark_model  # <-- this is your trained PipelineModel
+fitted_pipeline = spark_model  # <-- this is the trained PipelineModel
 # Get the fitted LR stage:
 lrm = [s for s in fitted_pipeline.stages if isinstance(s, LogisticRegressionModel)][0]
 
@@ -354,7 +313,7 @@ assert assembler is not None, "VectorAssembler not found in pipeline."
 assert lr_model is not None, "LogisticRegressionModel not found in pipeline."
 
 print(lr_model)
-# -------- Build a realistic RAW input example (these are the raw fields your endpoint will accept)
+# -------- Build a realistic RAW input example (these are the raw fields the endpoint accepts)
 example_pd = pd.DataFrame({
     "job_id": ["JOB-2025"],
     "job_title": ["ML Engineer"],
@@ -394,7 +353,7 @@ attrs_meta = fe_df.schema[vec_col].metadata.get("ml_attr", {}).get("attrs", {})
 if not attrs_meta:
     raise RuntimeError(
         "No attribute metadata found on the assembler output column. "
-        "Ensure your pipeline preserved ML attrs, or fall back to Option 3 (index-only names)."
+        "Ensure pipeline preserved ML attrs, or fall back to Option 3 (index-only names)."
     )
 
 pairs = []
@@ -545,7 +504,7 @@ with open(MODULE_FILE, "w") as f:
 print(f"✓ Wrote module: {MODULE_FILE}")
 
 mlflow.set_tracking_uri("databricks")
-EXP_NAME = "/Users/loganramos00@gmail.com/job_pyfunc_uc"
+EXP_NAME = f"/Users/{current_user}/job_pyfunc_uc"
 
 try:
     exp_id = mlflow.create_experiment(EXP_NAME, artifact_location=VOLUME_ARTIFACT_ROOT)
@@ -670,3 +629,58 @@ example_input = pd.DataFrame({
 # Run prediction
 result = model.predict(example_input)
 display(result)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Deploy/Update Model Serving Endpoint
+# MAGIC Automatically creates or updates a serving endpoint for this model.
+
+# COMMAND ----------
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedEntityInput
+
+w = WorkspaceClient()
+
+endpoint_name = "job-competitiveness-endpoint"
+# Use the model name and version from the registration step above
+# uc_model_name was defined earlier as "main.ml_models.jobs_pyfunc"
+# model_version was defined earlier
+
+print(f"Deploying model {uc_model_name} version {model_version} to endpoint {endpoint_name}...")
+
+try:
+    # Check if endpoint exists
+    w.serving_endpoints.get(name=endpoint_name)
+    print(f"Updating existing endpoint {endpoint_name}...")
+    
+    w.serving_endpoints.update_config(
+        name=endpoint_name,
+        served_entities=[
+            ServedEntityInput(
+                entity_name=uc_model_name,
+                entity_version=model_version,
+                scale_to_zero_enabled=True,
+                workload_size="Small"
+            )
+        ]
+    )
+except Exception as e:
+    # If not found (or other error), try creating
+    print(f"Endpoint {endpoint_name} not found (or error: {e}). Creating...")
+    w.serving_endpoints.create(
+        name=endpoint_name,
+        config=EndpointCoreConfigInput(
+            served_entities=[
+                ServedEntityInput(
+                    entity_name=uc_model_name,
+                    entity_version=model_version,
+                    scale_to_zero_enabled=True,
+                    workload_size="Small"
+                )
+            ]
+        )
+    )
+
+print(f"Endpoint {endpoint_name} deployment initiated.")
