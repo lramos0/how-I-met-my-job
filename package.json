@@ -8,16 +8,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lramos0/how-I-met-my-job.git"
+    "url": "git+https://github.com/CraigsArray/how-I-met-my-job.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/lramos0/how-I-met-my-job/issues"
+    "url": "https://github.com/CraigsArray/how-I-met-my-job/issues"
   },
-  "homepage": "https://github.com/lramos0/how-I-met-my-job#readme",
+  "homepage": "https://github.com/CraigsArray/how-I-met-my-job#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.84.0"
   }

@@ -4,98 +4,6 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade "mlflow-skinny[databricks]" databricks-sdk
-# MAGIC dbutils.library.restartPython()
-
-# COMMAND ----------
-
-# pyspark==3.x
-from pyspark.sql import SparkSession, Row, types as T
-import random, datetime
-
-spark = SparkSession.builder.appName("synthetic_job_matching_profiles_labeled").getOrCreate()
-random.seed(42)
-
-# // SAME VOCABULARIES AS BEFORE //
-first_names = ["Avery","Jordan","Taylor","Riley","Casey","Skyler","Alex","Sam","Morgan","Quinn"]
-last_names  = ["Nguyen","Patel","Garcia","Smith","Kim","Chen","Brown","Johnson","Williams","Jones"]
-skills_pool = ["Python","Java","C++","Go","Scala","JavaScript","React","Node.js","Docker","Kubernetes",
-               "AWS","SQL","NoSQL","Spark","TensorFlow","PyTorch","Pandas","Tableau","Statistics","Linux"]
-roles = ["Software Engineer","Data Scientist","ML Engineer","Product Manager","Designer","DevOps Engineer"]
-education_levels = ["High School","Associate","Bachelor","Master","PhD"]
-industries = ["Software","FinTech","Healthcare","Retail","Media","Automotive"]
-certs = ["AWS Solutions Architect","Azure Fundamentals","Scrum Master (CSM)","CCNA","Tableau Desktop"]
-cities = ["San Francisco, CA","Seattle, WA","Austin, TX","New York, NY","Chicago, IL"]
-
-def pick_some(pool, lo, hi): return random.sample(pool, random.randint(lo, hi))
-def years_exp_by_education(edu): return {"High School":(0,8),"Associate":(1,10),"Bachelor":(1,12),"Master":(3,15),"PhD":(4,18)}[edu]
-def current_title_from_skills(skills):
-    if {"TensorFlow","PyTorch"} & set(skills): return "ML Engineer"
-    if {"React","Node.js"} & set(skills): return "Software Engineer"
-    if {"Docker","Kubernetes"} & set(skills): return "DevOps Engineer"
-    if {"Tableau","Statistics"} & set(skills): return "Data Scientist"
-    return random.choice(roles)
-
-def compute_competitiveness(years, edu, num_skills, num_certs, num_achievements):
-    base = (years / 2) + (num_skills / 2) + num_certs + (2 if edu in ["Master","PhD"] else 0) + num_achievements
-    noise = random.uniform(-1, 1)
-    return int(max(0, min(10, base / 3 + noise)))
-
-# // SCHEMA (WITH COMPETITIVENESS_SCORE) //
-schema = T.StructType([
-    T.StructField("candidate_id", T.StringType(), False),
-    T.StructField("full_name", T.StringType(), False),
-    T.StructField("location", T.StringType(), True),
-    T.StructField("education_level", T.StringType(), True),
-    T.StructField("years_experience", T.IntegerType(), True),
-    T.StructField("skills", T.ArrayType(T.StringType()), True),
-    T.StructField("certifications", T.ArrayType(T.StringType()), True),
-    T.StructField("current_title", T.StringType(), True),
-    T.StructField("industries", T.ArrayType(T.StringType()), True),
-    T.StructField("achievements", T.ArrayType(T.StringType()), True),
-    T.StructField("competitiveness_score", T.IntegerType(), True),
-    T.StructField("last_updated", T.DateType(), True)
-])
-
-rows = []
-today = datetime.date.today()
-
-for i in range(25):
-    fn, ln = random.choice(first_names), random.choice(last_names)
-    edu = random.choice(education_levels)
-    yrs = random.randint(*years_exp_by_education(edu))
-    skills = pick_some(skills_pool, 6, 12)
-    cert_list = pick_some(certs, 0, 2)
-    achievements = pick_some(["Mentored juniors","Open source contributions","Conference speaker",
-                              "Patent filed","Process automation initiative","Top performer award"], 0, 3)
-    title = current_title_from_skills(skills)
-    industries_sample = pick_some(industries, 1, 2)
-
-    competitiveness = compute_competitiveness(yrs, edu, len(skills), len(cert_list), len(achievements))
-
-    rows.append(Row(
-        candidate_id=f"CAND-{1000+i}",
-        full_name=f"{fn} {ln}",
-        location=random.choice(cities),
-        education_level=edu,
-        years_experience=yrs,
-        skills=skills,
-        certifications=cert_list,
-        current_title=title,
-        industries=industries_sample,
-        achievements=achievements,
-        competitiveness_score=competitiveness,
-        last_updated=today
-    ))
-
-df = spark.createDataFrame(rows, schema=schema)
-
-# Preview
-df.show(10, truncate=False)
-
-
-# COMMAND ----------
-
 # (Optional) Pick a catalog/schema (Unity Catalog) or just a database (Hive metastore)
 spark.sql("DROP TABLE IF EXISTS ml_data.candidate_profiles")
 spark.sql("CREATE DATABASE IF NOT EXISTS ml_data")
@@ -115,25 +23,6 @@ pred_test = model.transform(test_df)
 
 evaluator_roc = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderROC")
 evaluator_pr  = BinaryClassificationEvaluator(labelCol="label", rawPredictionCol="rawPrediction", metricName="areaUnderPR")
-
-auc_roc = evaluator_roc.evaluate(pred_test)
-auc_pr  = evaluator_pr.evaluate(pred_test)
-print(f"AUC-ROC: {auc_roc:.3f} | AUC-PR: {auc_pr:.3f}")
-
-# // EXTRACT CLEAN PROBABILITY COLUMN //
-get_prob = F.udf(lambda v: float(v[1]), T.DoubleType())
-pred_test = pred_test.withColumn("competitive_prob", get_prob(F.col("probability")))
-
-# Preview predictions
-pred_test.select(
-    "candidate_id", "full_name", "current_title", "years_experience",
-    "education_level", "competitive_prob", "prediction", "label"
-).orderBy(F.asc("competitive_prob")).show(20, truncate=False)
-
-# // SAVE MODEL (OPTIONAL) //
-# model.write().overwrite().save("dbfs:/models/competitive_classifier_lr")
-
-# // WRITE PREDICTIONS (OPTIONAL) //
 # spark.sql("CREATE DATABASE IF NOT EXISTS ml_scoring")
 # pred_test.select("candidate_id","competitive_prob","prediction","label").write \
 #   .format("delta").mode("overwrite").saveAsTable("ml_scoring.candidate_competitiveness_predictions")

@@ -6,4 +6,4 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://dbc-0b26f498-9c35.cloud.databricks.com/
+      host: https://dbc-b2d8dba7-1078.cloud.databricks.com
