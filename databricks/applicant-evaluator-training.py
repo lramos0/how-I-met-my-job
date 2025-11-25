@@ -5,6 +5,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install --upgrade "mlflow-skinny[databricks]"
+# MAGIC %pip install --upgrade "supabase"
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -96,28 +97,55 @@ df.show(10, truncate=False)
 
 # COMMAND ----------
 
-# (Optional) Pick a catalog/schema (Unity Catalog) or just a database (Hive metastore)
-spark.sql("DROP TABLE IF EXISTS ml_data.candidate_profiles")
-spark.sql("CREATE DATABASE IF NOT EXISTS ml_data")
-spark.sql("USE ml_data")
+import supabase
+SUPABASE_URL = "https://xaooqthrquigpwpsbmss.supabase.co"
+SUPABASE_KEY = 'yomasaho'
+supabase_client: supabase.Client = supabase.create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Overwrite (or create) the table as Delta
-df.write \
-  .format("delta") \
-  .mode("overwrite") \
-  .option("overwriteSchema", "true") \
-  .saveAsTable("candidate_profiles")
+import requests
+import json
+
+SUPABASE_URL = "https://xaooqthrquigpwpsbmss.supabase.co"
+API_KEY = SUPABASE_KEY
+
+headers = {
+    "apikey": API_KEY,
+    "Authorization": f"Bearer {API_KEY}",
+}
+
+resp = requests.get(
+    f"{SUPABASE_URL}/rest/v1/user_resumes",
+    headers=headers,
+    params={"select": "*"},
+)
+resp.raise_for_status()
+
+data = resp.json()   # list[dict] or []
+
+# If Supabase returns a single object instead of list, normalize:
+if isinstance(data, dict):
+    data = [data]
+
+# Use Pandas as a bridge (works great on serverless; no sparkContext)
+pdf = pd.DataFrame(data)
+supabase_spark_df = spark.createDataFrame(pdf)
+
+supabase_spark_df.printSchema()
+supabase_spark_df.show(10, truncate=False)
+
+joined = df.join(
+    supabase_spark_df,
+    df.candidate_id == supabase_spark_df.candidate_id,
+    "outer"
+)
+
+display(joined)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Pull in generated training data
 # MAGIC
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT * FROM ml_data.candidate_profiles
 
 # COMMAND ----------
 
@@ -155,21 +183,14 @@ df_debug.agg(
 
 # COMMAND ----------
 
-# pyspark 3.x
 from pyspark.sql import functions as F, types as T
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import (
-    StringIndexer, OneHotEncoder, CountVectorizer, VectorAssembler
+    StringIndexer, OneHotEncoder, VectorAssembler
 )
+from pyspark.ml.feature import HashingTF
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
-
-# -----------------------------------------------------------------------------
-# Assumes you already have df with these columns (from the previous step):
-# ['candidate_id','full_name','location','education_level','years_experience',
-#  'skills','certifications','current_title','industries','achievements',
-#  'competitiveness_score','last_updated']
-# -----------------------------------------------------------------------------
 
 # 1) Define the binary label from competitiveness_score (threshold can be tuned)
 df_labeled = df_mapped.withColumn(
@@ -177,7 +198,7 @@ df_labeled = df_mapped.withColumn(
     F.when(F.col("competitiveness_score") >= F.lit(0.5), F.lit(1.0)).otherwise(F.lit(0.0))
 )
 
-# 2) Split train/test
+# 2) Split train/test (same as before)
 fractions = [0.8, 0.2]
 for attempt in range(20):
     train_df, test_df = df_labeled.randomSplit(fractions, seed=42 + attempt)
@@ -190,32 +211,32 @@ else:
     raise RuntimeError("Could not obtain both classes in both splits after 20 attempts.")
 
 # 3) Feature transformers
-# Array/bag features
-cv_skills = CountVectorizer(
+# --- Hash-based text features (fixed size) ---
+hash_skills = HashingTF(
     inputCol="skills",
-    outputCol="vec_skills",
-    minDF=20.0,
-    minTF=1.0
+    outputCol="skills_vec",
+    numFeatures=1024
 )
-cv_certs = CountVectorizer(
-    inputCol="certifications",
-    outputCol="vec_certs",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_industries = CountVectorizer(
-    inputCol="industries",
-    outputCol="vec_industries",
-    minDF=20.0,
-    minTF=1.0
-)
-cv_achievements = CountVectorizer(
-    inputCol="achievements",
-    outputCol="vec_achievements",
-    minDF=20.0,
-    minTF=1.0)
 
-# Categorical features
+hash_certs = HashingTF(
+    inputCol="certifications",
+    outputCol="certs_vec",
+    numFeatures=512
+)
+
+hash_industries = HashingTF(
+    inputCol="industries",
+    outputCol="industries_vec",
+    numFeatures=512
+)
+
+hash_achievements = HashingTF(
+    inputCol="achievements",
+    outputCol="achievements_vec",
+    numFeatures=1024
+)
+
+# --- Categorical features ---
 idx_edu   = StringIndexer(inputCol="education_level", outputCol="idx_education_level", handleInvalid="keep")
 idx_title = StringIndexer(inputCol="current_title",   outputCol="idx_current_title",   handleInvalid="keep")
 idx_loc   = StringIndexer(inputCol="location",        outputCol="idx_location",        handleInvalid="keep")
@@ -226,19 +247,22 @@ ohe = OneHotEncoder(
     handleInvalid="keep"
 )
 
-# Numeric feature(s)
-# years_experience is already numeric; you can add engineered features if desired
+# --- Numeric + assembled features ---
 assembler = VectorAssembler(
     inputCols=[
-        "vec_skills", "vec_certs", "vec_industries", "vec_achievements",
-        "ohe_education_level", "ohe_current_title", "ohe_location",
+        "skills_vec",
+        "certs_vec",
+        "industries_vec",
+        "achievements_vec",
+        "ohe_education_level",
+        "ohe_current_title",
+        "ohe_location",
         "years_experience"
     ],
     outputCol="features"
 )
 
 # 4) Classifier
-# Elastic-net logistic regression generally works well on sparse high-dim features
 lr = LogisticRegression(
     featuresCol="features",
     labelCol="label",
@@ -250,16 +274,17 @@ lr = LogisticRegression(
     elasticNetParam=0.5
 )
 
-# 5) Pipeline
+# 5) Pipeline: use hash_* transformers here
 pipe = Pipeline(stages=[
-    cv_skills, cv_certs, cv_industries, cv_achievements,
+    hash_skills, hash_certs, hash_industries, hash_achievements,
     idx_edu, idx_title, idx_loc, ohe,
     assembler, lr
 ])
 
 # 6) Train
 model = pipe.fit(train_df)
-spark_model = model 
+spark_model = model
+
 # 7) Evaluate (AUC)
 pred_test = model.transform(test_df)
 
@@ -279,14 +304,6 @@ pred_test.select(
     "candidate_id", "full_name", "current_title", "years_experience",
     "education_level", "competitive_prob", "prediction", "label"
 ).orderBy(F.asc("competitive_prob")).show(20, truncate=False)
-
-# 9) (Optional) Save the model for reuse
-# model.write().overwrite().save("dbfs:/models/competitive_classifier_lr")
-
-# 10) (Optional) Write predictions to a Delta table
-# spark.sql("CREATE DATABASE IF NOT EXISTS ml_scoring")
-# pred_test.select("candidate_id","competitive_prob","prediction","label").write \
-#   .format("delta").mode("overwrite").saveAsTable("ml_scoring.candidate_competitiveness_predictions")
 
 
 # COMMAND ----------
@@ -358,11 +375,11 @@ assert lr_model is not None, "LogisticRegressionModel not found in pipeline."
 print(lr_model)
 # -------- Build a realistic RAW input example (these are the raw fields your endpoint will accept)
 example_pd = pd.DataFrame({
-    "candidate_id": ["CAND-2025"],
-    "full_name": ["Avery Patel"],
-    "location": ["Seattle, WA"],
-    "education_level": ["Master"],
-    "years_experience": [7.0],
+    "candidate_id": "CAND-2025",
+    "full_name": "Avery Patel",
+    "location": "Seattle, WA",
+    "education_level": "Master",
+    "years_experience":7.0,
     "skills": [["Python","Spark","TensorFlow","AWS","Docker"]],
     "certifications": [["AWS Solutions Architect"]],
     "current_title": ["ML Engineer"],
@@ -439,6 +456,11 @@ with open(MODULE_FILE, "w") as f:
         import pandas as pd
         import numpy as np
         import mlflow.pyfunc
+        from supabase import create_client, Client
+
+        SUPABASE_URL = 'https://xaooqthrquigpwpsbmss.supabase.co'
+        SUPABASE_KEY = 'yomasaho'
+        supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
         def _ohe_row(value, categories, drop_last):
             k = len(categories) - (1 if drop_last else 0)
@@ -522,24 +544,60 @@ with open(MODULE_FILE, "w") as f:
 
                 X = pd.DataFrame(rows)
 
-                for name in self.expanded_feature_names:
-                    if name not in X.columns:
-                        X[name] = 0.0
-                X = X[self.expanded_feature_names]
+                # 🔧 One-shot reindex: add missing columns + correct order, fill with 0.0
+                X = X.reindex(columns=self.expanded_feature_names, fill_value=0.0)
 
                 return X
 
+
+            def _json_safe(self, obj):
+                \"\"\"Recursively convert numpy types to JSON-serializable Python types.\"\"\"
+                if isinstance(obj, np.generic):
+                    return obj.item()
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                if isinstance(obj, list):
+                    return [self._json_safe(v) for v in obj]
+                if isinstance(obj, dict):
+                    return {k: self._json_safe(v) for k, v in obj.items()}
+                return obj
+
             def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
+                # 1) Featurize and compute scores
                 X = self._featurize(model_input)
                 score = X.values.dot(self.w_vec)
                 prob = _sigmoid(score)
+
+                # 2) Build JSON-safe records for Supabase
+                # Replace NaNs with None (JSON-friendly)
+                clean_df = model_input.where(pd.notnull(model_input), None)
+                records = clean_df.to_dict(orient="records")
+                records = [self._json_safe(r) for r in records]
+
+                # 3) Insert into Supabase, but don't let failures break scoring
+                try:
+                    if records:
+                        supabase_client.table("user_resumes").insert(records).execute()
+                except Exception as e:
+                    # In serving, this will show up in logs but won't break the endpoint
+                    print(f"Supabase insert failed: {e}")
+
+                # 4) Return predictions as a DataFrame
+                n = len(X)
+                candidate_ids = (
+                    model_input["candidate_id"]
+                    if "candidate_id" in model_input.columns
+                    else pd.Series([None] * n)
+                )
+
                 return pd.DataFrame({
-                    "candidate_id": model_input.get("candidate_id", pd.Series([None]*len(X))),
+                    "candidate_id": candidate_ids,
                     "competitive_score": prob
                 })
 
         mlflow.models.set_model(CompetitivePyFunc())
     """))
+
 
 print(f"✓ Wrote module: {MODULE_FILE}")
 
@@ -566,9 +624,10 @@ conda_env = {
         'pip',
         {'pip': [
             'mlflow>=2.9.0',
-            'pandas==1.5.3',
-            'numpy==1.26.4',
-            'psutil==5.9.0'
+            'pandas',
+            'numpy',
+            'psutil==5.9.0',
+            'supabase'
         ]}
     ]
 }
@@ -649,7 +708,7 @@ from mlflow import MlflowClient
 
 model_id = "m-6a96ecb8043d4454b585e036d0e33e63"
 
-pyfunc_uri = f"models:/{model_id}"
+pyfunc_uri = f"models:/m-c22e7c0031054a1b8641a7bfb29f6050"
 model = mlflow.pyfunc.load_model(pyfunc_uri)
 
 # Example input (same structure as training)
@@ -666,6 +725,10 @@ example_input = pd.DataFrame({
     "achievements": [["Open source contributor"]]
 })
 
+
+
+# COMMAND ----------
+
 # Run prediction
 result = model.predict(example_input)
-display(result)
+print(result)
