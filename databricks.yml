@@ -1,0 +1,9 @@
+bundle:
+  name: how-i-met-my-job
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-b2d8dba7-1078.cloud.databricks.com

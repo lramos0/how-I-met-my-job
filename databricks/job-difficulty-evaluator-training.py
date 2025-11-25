@@ -13,92 +13,22 @@
 from pyspark.sql import Row, types as T
 import random, datetime
 
-random.seed(42)
+# JDBC Configuration
+# NOTE: Replace [YOUR_PASSWORD] with your actual database password.
+# In production, use dbutils.secrets.get(scope="<scope>", key="<key>")
+jdbc_url = "jdbc:postgresql://db.xaooqthrquigpwpsbmss.supabase.co:5432/postgres"
+db_user = "postgres"
+db_password = "[YOUR_PASSWORD]"
 
-# --- Vocabularies for job listings ---
-job_titles = [
-    "Software Engineer", "Data Scientist", "ML Engineer", "Product Manager", "UX Designer",
-    "DevOps Engineer", "QA Engineer", "Business Analyst", "Cloud Architect", "Security Engineer"
-]
-companies = [
-    "Techify", "DataWiz", "CloudNova", "InnoSoft", "FinEdge", "HealthSync", "RetailX", "AutoAI", "MediaWorks", "GreenEnergy"
-]
-locations = [
-    "San Francisco, CA", "Seattle, WA", "Austin, TX", "New York, NY", "Chicago, IL",
-    "Boston, MA", "Denver, CO", "Atlanta, GA", "Los Angeles, CA", "Dallas, TX"
-]
-skills_pool = [
-    "Python", "Java", "C++", "Go", "Scala", "JavaScript", "React", "Node.js", "Docker", "Kubernetes",
-    "AWS", "Azure", "GCP", "SQL", "NoSQL", "Spark", "TensorFlow", "PyTorch", "Pandas", "Tableau"
-]
-industries = [
-    "Software", "FinTech", "Healthcare", "Retail", "Media", "Automotive", "Energy", "Education", "Logistics", "Security"
-]
-employment_types = ["Full-time", "Part-time", "Contract", "Internship"]
-experience_levels = ["Entry", "Mid", "Senior", "Lead"]
-certs = [
-    "AWS Solutions Architect", "Azure Fundamentals", "Scrum Master (CSM)", "CCNA", "Tableau Desktop", "GCP Professional"
-]
-
-def pick_some(pool, lo, hi): return random.sample(pool, random.randint(lo, hi))
-
-def compute_listing_competitiveness(salary, num_skills, num_certs, exp_level, industry_demand):
-    base = (salary / 20000) + (num_skills / 2) + num_certs + (2 if exp_level in ["Senior", "Lead"] else 0) + industry_demand
-    noise = random.uniform(-1, 1)
-    return int(max(0, min(10, base / 3 + noise)))
-
-# --- Schema for job listings (with competitiveness_score) ---
-schema = T.StructType([
-    T.StructField("job_id", T.StringType(), False),
-    T.StructField("job_title", T.StringType(), False),
-    T.StructField("company", T.StringType(), False),
-    T.StructField("location", T.StringType(), True),
-    T.StructField("industry", T.StringType(), True),
-    T.StructField("employment_type", T.StringType(), True),
-    T.StructField("experience_level", T.StringType(), True),
-    T.StructField("required_skills", T.ArrayType(T.StringType()), True),
-    T.StructField("required_certifications", T.ArrayType(T.StringType()), True),
-    T.StructField("salary_usd", T.IntegerType(), True),
-    T.StructField("posting_date", T.DateType(), True),
-    T.StructField("competitiveness_score", T.IntegerType(), True)
-])
-
-rows = []
-today = datetime.date.today()
-
-for i in range(25):
-    title = random.choice(job_titles)
-    company = random.choice(companies)
-    loc = random.choice(locations)
-    industry = random.choice(industries)
-    emp_type = random.choice(employment_types)
-    exp_level = random.choice(experience_levels)
-    skills = pick_some(skills_pool, 5, 10)
-    cert_list = pick_some(certs, 0, 2)
-    salary = random.randint(70000, 220000)
-    posting_date = today - datetime.timedelta(days=random.randint(0, 30))
-    industry_demand = random.randint(0, 3)  # Simulate demand for the industry
-
-    competitiveness = compute_listing_competitiveness(
-        salary, len(skills), len(cert_list), exp_level, industry_demand
-    )
-
-    rows.append(Row(
-        job_id=f"JOB-{1000+i}",
-        job_title=title,
-        company=company,
-        location=loc,
-        industry=industry,
-        employment_type=emp_type,
-        experience_level=exp_level,
-        required_skills=skills,
-        required_certifications=cert_list,
-        salary_usd=salary,
-        posting_date=posting_date,
-        competitiveness_score=competitiveness
-    ))
-
-df = spark.createDataFrame(rows, schema=schema)
+# Read from Supabase
+df = spark.read \
+    .format("jdbc") \
+    .option("url", jdbc_url) \
+    .option("dbtable", "job_listings") \
+    .option("user", db_user) \
+    .option("password", db_password) \
+    .option("driver", "org.postgresql.Driver") \
+    .load()
 
 display(df)
 
@@ -655,16 +585,17 @@ model = mlflow.pyfunc.load_model(pyfunc_uri)
 
 # Example input (same structure as training)
 example_input = pd.DataFrame({
-    "candidate_id": ["CAND-2025"],
-    "full_name": ["Avery Patel"],
+    "job_id": ["JOB-2025"],
+    "job_title": ["ML Engineer"],
+    "company": ["Techify"],
     "location": ["Seattle, WA"],
-    "education_level": ["Master"],
-    "years_experience": [7.0],
-    "skills": [["Python","Spark","TensorFlow","AWS","Docker"]],
-    "certifications": [["AWS Solutions Architect"]],
-    "current_title": ["ML Engineer"],
-    "industries": [["Software","FinTech"]],
-    "achievements": [["Open source contributor"]]
+    "industry": ["FinTech"],
+    "employment_type": ["Full-time"],
+    "experience_level": ["Senior"],
+    "required_skills": [["Python", "Spark", "TensorFlow", "AWS", "Docker"]],
+    "required_certifications": [["AWS Solutions Architect"]],
+    "salary_usd": [180000],
+    "posting_date": [pd.to_datetime("2025-10-29")],
 })
 
 # Run prediction

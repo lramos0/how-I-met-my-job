@@ -7,4 +7,8 @@ __pycache__/
 *.csv
 .csv
 app.py
-parsed_resume.json
+# Local Netlify folder
+.netlify
+
+# Node modules
+node_modules/
