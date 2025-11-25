@@ -406,7 +406,7 @@ function computeMatch(jobs) {
     jobs.sort((a, b) => b.match_score - a.match_score);
 
     // Filter by last 30days
-    const days_old = 30;
+    const days_old = 90;
     const cutoff_date = new Date(Date.now() - days_old * 24 *60 * 60 * 1000);
     const recent = jobs.filter(job => new Date(job.posted_date) >= cutoff_date);
     const top = recent.slice(0, 50); // 
