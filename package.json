@@ -1,0 +1,24 @@
+{
+    "name": "how-i-met-my-job",
+    "version": "1.0.0",
+    "description": "This repository contains a static dashboard in `web` and a Netlify Functions folder `functions/` with a mock `classify-cv` function used by the frontend.",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/lramos0/how-I-met-my-job.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "bugs": {
+        "url": "https://github.com/lramos0/how-I-met-my-job/issues"
+    },
+    "homepage": "https://github.com/lramos0/how-I-met-my-job#readme",
+    "dependencies": {
+        "@supabase/supabase-js": "^2.84.0"
+    }
+}
