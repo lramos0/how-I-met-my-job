@@ -12,7 +12,6 @@ exports.handler = async (event, context) => {
         const { data, error } = await supabase
             .from('job_listings')
             .select('*')
-            .limit(50);
 
         if (error) {
             console.error("Supabase error:", error);
