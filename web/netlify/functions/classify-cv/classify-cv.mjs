@@ -12,7 +12,7 @@ export default async (req, context) => {
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
-    const DATABRICKS_URL = "https://dbc-0b26f498-9c35.cloud.databricks.com/serving-endpoints/user-score/invocations";
+    const DATABRICKS_URL = "https://dbc-461c0150-500e.cloud.databricks.com/serving-endpoints/users/invocations";
     // --- 2) Auth logic ---
     const accessKeyPub = process.env.DBX_KEY;
     const betaPassword = process.env.BETA_PASSWORD;
