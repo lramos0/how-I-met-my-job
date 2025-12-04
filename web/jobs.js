@@ -424,7 +424,6 @@ function computeMatch(jobs) {
             const location = job.job_location || 'N/A';
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
-
             let applyLink = job.job_url || job.url || job.link;
 
 
