@@ -424,7 +424,9 @@ function computeMatch(jobs) {
             const location = job.job_location || 'N/A';
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
-            const applyLink = job.job_url || '#';
+
+            let applyLink = job.job_url || job.url || job.link;
+
 
             // Parses posted date
             let postedRaw = job.job_posted_date;
