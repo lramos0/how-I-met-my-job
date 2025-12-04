@@ -32,6 +32,34 @@ async function loadResume() {
     // 1) Legacy object: { name, email, education, skills: [] }
     // 2) Parser output with inputs: [{ ...fields... }]
     let raw = JSON.parse(data);
+
+    // Helper to normalize skills
+    function normalizeSkills(skillsArr) {
+        const skill_dict = SKILL_DICT;
+        const lowered = skillsArr.map(s => String(s).toLowerCase());
+        const out = new Set();
+        lowered.forEach(s => {
+            // Direct match
+            if (skill_dict[s]) {
+                out.add(s);
+                return;
+            }
+            // Checks aliases
+            for (const canonical in skill_dict) {
+                const aliases = skill_dict[canonical];
+                for (let i = 0; i < aliases.length; i++) {
+                    if (aliases[i] && s.indexOf(aliases[i]) !== -1) {
+                        out.add(canonical);
+                        return;
+                    }
+                }
+            }
+            // Fallback: adds original token
+            if (s) out.add(s);
+        });
+        return Array.from(out);
+    }
+
     let resume = raw;
     if (raw && raw.inputs && Array.isArray(raw.inputs) && raw.inputs.length) {
         // Uses first input record
@@ -56,31 +84,6 @@ async function loadResume() {
         // Normalizes skills to canonical names
         const skill_dict = SKILL_DICT;
 
-        function normalizeSkills(skillsArr) {
-            const lowered = skillsArr.map(s => String(s).toLowerCase());
-            const out = new Set();
-            lowered.forEach(s => {
-                // Direct match
-                if (skill_dict[s]) {
-                    out.add(s);
-                    return;
-                }
-                // Checks aliases
-                for (const canonical in skill_dict) {
-                    const aliases = skill_dict[canonical];
-                    for (let i = 0; i < aliases.length; i++) {
-                        if (aliases[i] && s.indexOf(aliases[i]) !== -1) {
-                            out.add(canonical);
-                            return;
-                        }
-                    }
-                }
-                // Fallback: adds original token
-                if (s) out.add(s);
-            });
-            return Array.from(out);
-        }
-
         resume.skills = normalizeSkills(resume.skills);
     } else {
         // Normalizes legacy shape
@@ -90,6 +93,7 @@ async function loadResume() {
         if (!Array.isArray(resume.skills)) {
             resume.skills = typeof resume.skills === 'string' ? resume.skills.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean) : [];
         }
+        resume.skills = normalizeSkills(resume.skills);
     }
 
     window.resumeData = resume;
@@ -407,15 +411,10 @@ function computeMatch(jobs) {
 
     // Filter by last 30days
     const days_old = 90;
-    const cutoff_date = new Date(Date.now() - days_old * 24 *60 * 60 * 1000);
-    const recent = jobs.filter(job => {
-        const raw = job.job_posted_date || job.posted_date; // be robust
-        if (!raw) return false;
-        const d = new Date(raw);
-        return !isNaN(d) && d >= cutoff_date;
-    });
+    const cutoff_date = new Date(Date.now() - days_old * 24 * 60 * 60 * 1000);
+    const recent = jobs.filter(job => new Date(job.job_posted_date || job.posted_date) >= cutoff_date);
     const top = recent.slice(0, 50); // 
-    
+
 
     const jobResults = document.getElementById("jobResults");
     if (jobResults) {
@@ -425,7 +424,8 @@ function computeMatch(jobs) {
             const location = job.job_location || 'N/A';
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
-            const applyLink = job.job_url || '#';
+            let applyLink = job.job_url || job.url || job.link;
+
 
             // Parses posted date
             let postedRaw = job.job_posted_date;
