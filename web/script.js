@@ -204,8 +204,22 @@ function extractEducation(text) {
 }
 
 function extractSkills(text) {
-    const skills = ["python", "java", "javascript", "spark", "tensorflow", "aws", "docker"];
-    return skills.filter(s => text.toLowerCase().includes(s));
+    const lower = text.toLowerCase();
+    const out = new Set();
+    if (typeof SKILL_DICT === 'object') {
+        Object.keys(SKILL_DICT).forEach(canonical => {
+            const aliases = SKILL_DICT[canonical] || [];
+            for (let i = 0; i < aliases.length; i++) {
+                const a = String(aliases[i]).toLowerCase();
+                if (!a) continue;
+                if (lower.indexOf(a) !== -1) {
+                    out.add(canonical);
+                    break;
+                }
+            }
+        });
+    }
+    return Array.from(out);
 }
 
 function extractCerts(text) {
@@ -218,7 +232,8 @@ function extractCerts(text) {
 function extractTitle(text) {
     const roles = [
         "Software Engineer", "ML Engineer", "Data Scientist", "Developer",
-        "Teacher", "Counselor", "Supervisor", "Specialist"
+        "Teacher", "Counselor", "Supervisor", "Specialist", "Analyst",
+        "Manager", "Director", "Administrator", "Coordinator", "Consultant"
     ];
     for (let r of roles) {
         const regex = new RegExp(r, "i");
