@@ -424,30 +424,14 @@ function computeMatch(jobs) {
             const location = job.job_location || 'N/A';
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
-
-            let applyLink = job.job_url || job.url || job.link;
-
+            const applyLink = job.url;
 
             // Parses posted date
             let postedRaw = job.job_posted_date;
             const postedRelative = timeAgo(postedRaw);
 
-            const salary = job.salary || '';
-
             // Formats salary
-            let salaryDisplay = '';
-            if (typeof salary === 'string' && salary.trim()) salaryDisplay = salary;
-            else if (typeof salary === 'object' && salary !== null) {
-                const min = salary.min || salary.min_salary || salary.salary_min;
-                const max = salary.max || salary.max_salary || salary.salary_max;
-                if (min || max) salaryDisplay = `$${min || '?'} - $${max || '?'} `;
-            }
-
-            // Match score color
-            let matchColor = 'bg-secondary';
-            if (job.match_score >= 70) matchColor = 'bg-success';
-            else if (job.match_score >= 40) matchColor = 'bg-warning text-dark';
-
+            let salaryDisplay = job.job_base_pay_range || '';
             return `
             <div class="card job-card mb-3 p-3">
                 <div class="row g-0">
@@ -464,11 +448,11 @@ function computeMatch(jobs) {
                         <div class="mb-2 metadata-text">
                             ${jobType !== 'N/A' ? `<span class="me-3"><i class="bi bi-briefcase-fill me-1"></i>${jobType}</span>` : ''}
                             ${seniority !== 'N/A' ? `<span class="me-3"><i class="bi bi-bar-chart-fill me-1"></i>${seniority}</span>` : ''}
-                            ${salaryDisplay ? `<span class="me-3"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
+                            ${salaryDisplay ? `<span class="me-3 fw-bold text-dark"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
                             <span class="text-success"><i class="bi bi-clock-history me-1"></i>${postedRelative}</span>
                         </div>
 
-                        ${job.job_summary ? `<div class="job-summary text-muted mt-2">${job.job_summary}</div>` : ''}
+                        ${description ? `<div class="job-summary text-muted mt-2">${description}</div>` : ''}
                     </div>
                     
                     <div class="col-md-2 d-flex flex-column align-items-end justify-content-between">

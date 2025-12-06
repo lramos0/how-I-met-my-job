@@ -31,3 +31,54 @@ pre {
     box-shadow: 0 4px 12px rgba(37, 117, 252, 0.3);
     color: white;
 }
+
+.job-card {
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s ease;
+    background: #ffffff;
+}
+
+.job-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: #b0b0b0;
+}
+
+.job-title-link {
+    color: #2c3e50;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.job-title-link:hover {
+    color: #2575fc;
+}
+
+.company-name {
+    font-weight: 600;
+    color: #555;
+}
+
+.metadata-text {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.job-summary {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #4a4a4a;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre-line;
+}
+
+.match-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
