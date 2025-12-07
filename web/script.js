@@ -86,6 +86,35 @@ async function sendJSON(bodyObj) {
 
 let resumeJSON = null;
 
+let skillDictPromise = null;
+async function ensureSkillDict() {
+    if (typeof SKILL_DICT === 'object') return SKILL_DICT;
+    if (skillDictPromise) {
+        await skillDictPromise;
+        return typeof SKILL_DICT === 'object' ? SKILL_DICT : {};
+    }
+
+    skillDictPromise = new Promise(resolve => {
+        // Avoid injecting multiple times
+        const existing = document.querySelector('script[data-skill-dict="true"]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve(typeof SKILL_DICT === 'object' ? SKILL_DICT : {}));
+            existing.addEventListener('error', () => resolve({}));
+            return;
+        }
+
+        const s = document.createElement('script');
+        s.src = 'model/data/skill_dict.js';
+        s.dataset.skillDict = 'true';
+        s.onload = () => resolve(typeof SKILL_DICT === 'object' ? SKILL_DICT : {});
+        s.onerror = () => resolve({});
+        document.head.appendChild(s);
+    });
+
+    await skillDictPromise;
+    return typeof SKILL_DICT === 'object' ? SKILL_DICT : {};
+}
+
 /* --------------------------------------------------------
    MAIN PARSER
 --------------------------------------------------------- */
@@ -121,6 +150,8 @@ async function parseResume() {
 
     status.textContent = "🤖 Parsing resume…";
 
+    const skills = await extractSkills(resumeText);
+
     resumeJSON = {
         inputs: [{
             candidate_id: "CAND-" + Date.now(),
@@ -128,7 +159,7 @@ async function parseResume() {
             location: extractLocation(resumeText),
             education_level: extractEducation(resumeText),
             years_experience: estimateYears(resumeText),
-            skills: extractSkills(resumeText),
+            skills,
             certifications: extractCerts(resumeText),
             current_title: extractTitle(resumeText),
             industries: extractIndustries(resumeText),
@@ -203,12 +234,13 @@ function extractEducation(text) {
     return "Unknown";
 }
 
-function extractSkills(text) {
+async function extractSkills(text) {
+    const dict = await ensureSkillDict();
     const lower = text.toLowerCase();
     const out = new Set();
-    if (typeof SKILL_DICT === 'object') {
-        Object.keys(SKILL_DICT).forEach(canonical => {
-            const aliases = SKILL_DICT[canonical] || [];
+    if (dict && typeof dict === 'object') {
+        Object.keys(dict).forEach(canonical => {
+            const aliases = dict[canonical] || [];
             for (let i = 0; i < aliases.length; i++) {
                 const a = String(aliases[i]).toLowerCase();
                 if (!a) continue;

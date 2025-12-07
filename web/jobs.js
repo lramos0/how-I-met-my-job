@@ -119,10 +119,11 @@ async function loadResume() {
         console.warn('Failed to infer job types', e);
     }
 
-    // Fetches jobs
+    // Fetches jobs from Netlify function
+    const msgEl = document.getElementById('dataMessage');
     try {
         const response = await fetch("/.netlify/functions/get-jobs");
-        if (!response.ok) throw new Error("Failed to load jobs");
+        if (!response.ok) throw new Error(`Failed to load jobs (HTTP ${response.status})`);
         const jobsData = await response.json();
 
         window.jobData = jobsData.map(item => {
@@ -149,7 +150,6 @@ async function loadResume() {
             return o;
         });
 
-        const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-success" role="alert">
@@ -159,11 +159,10 @@ async function loadResume() {
     } catch (err) {
         console.error(err);
         window.jobData = [];
-        const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-danger" role="alert">
-                    <strong>Error loading jobs:</strong> ${err.message}.
+                    <strong>Error loading jobs:</strong> ${err.message}
                 </div>`;
         }
     }
@@ -419,6 +418,12 @@ function computeMatch(jobs) {
                         </div>
 
                         ${job.job_summary ? `<div class="job-summary text-muted mt-2">${job.job_summary}</div>` : ''}
+                        
+                        ${job.job_description ? `
+                        <details class="mt-3">
+                            <summary class="text-primary" style="cursor:pointer;"><i class="bi bi-info-circle me-1"></i>Job Description</summary>
+                            <div class="job-description text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(job.job_description)}</div>
+                        </details>` : ''}
                     </div>
                     
                     <div class="col-md-2 d-flex flex-column align-items-end justify-content-between">
