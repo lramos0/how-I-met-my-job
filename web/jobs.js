@@ -119,10 +119,11 @@ async function loadResume() {
         console.warn('Failed to infer job types', e);
     }
 
-    // Fetches jobs
+    // Fetches jobs from Netlify function
+    const msgEl = document.getElementById('dataMessage');
     try {
         const response = await fetch("/.netlify/functions/get-jobs");
-        if (!response.ok) throw new Error("Failed to load jobs");
+        if (!response.ok) throw new Error(`Failed to load jobs (HTTP ${response.status})`);
         const jobsData = await response.json();
 
         window.jobData = jobsData.map(item => {
@@ -149,7 +150,6 @@ async function loadResume() {
             return o;
         });
 
-        const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-success" role="alert">
@@ -159,11 +159,10 @@ async function loadResume() {
     } catch (err) {
         console.error(err);
         window.jobData = [];
-        const msgEl = document.getElementById('dataMessage');
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-danger" role="alert">
-                    <strong>Error loading jobs:</strong> ${err.message}.
+                    <strong>Error loading jobs:</strong> ${err.message}
                 </div>`;
         }
     }
@@ -171,77 +170,7 @@ async function loadResume() {
     filterJobs();
 }
 
-// Skill dictionary
-const SKILL_DICT = {
-    "python": ["python", "python3", "cpython", "pypy"],
-    "java": ["java", "openjdk", "jdk", "jvm"],
-    "javascript": ["javascript", "js", "nodejs", "ecmascript"],
-    "typescript": ["typescript", "ts"],
-    "go": ["go", "golang"],
-    "c": ["c"],
-    "c++": ["c++", "cpp"],
-    "c#": ["c#", "csharp"],
-    "ruby": ["ruby", "ruby on rails", "rails"],
-    "php": ["php", "laravel", "symfony"],
-    "rust": ["rust"],
-    "kotlin": ["kotlin"],
-    "scala": ["scala"],
-    "r": ["r", "r language"],
-    "swift": ["swift"],
-    "shell": ["shell", "bash", "zsh", "sh"],
-    "perl": ["perl"],
-    "sql": ["sql", "mysql", "postgresql", "oracle", "sqlite", "mssql"],
-    "nosql": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
-    "big data": ["big data", "hadoop", "spark", "mapreduce", "hive", "pig"],
-    "data engineering": ["data engineering", "etl", "data pipeline", "airflow"],
-    "data science": ["data science", "machine learning", "ml", "statistics"],
-    "deep learning": ["deep learning", "neural networks", "tensorflow", "pytorch", "keras"],
-    "mlops": ["mlops", "model deployment", "model serving", "sagemaker", "mlflow"],
-    "nlp": ["nlp", "natural language processing", "transformers", "spacy", "nltk"],
-    "computer vision": ["computer vision", "cv", "opencv"],
-    "analytics": ["analytics", "business intelligence", "bi", "tableau", "power bi"],
-    "rest": ["rest", "restful api", "api", "web api"],
-    "graphql": ["graphql"],
-    "web frameworks": ["django", "flask", "express", "spring", "rails", "fastapi"],
-    "frontend frameworks": ["react", "angular", "vue", "svelte", "ember"],
-    "html": ["html", "html5"],
-    "css": ["css", "css3", "scss", "sass", "less"],
-    "webpack": ["webpack", "rollup", "parcel"],
-    "microservices": ["microservices", "service oriented architecture", "soa"],
-    "devops": ["devops", "ci/cd", "continuous integration", "continuous delivery", "continuous deployment"],
-    "docker": ["docker", "containers"],
-    "kubernetes": ["kubernetes", "k8s", "kube"],
-    "terraform": ["terraform"],
-    "ansible": ["ansible"],
-    "chef": ["chef"],
-    "puppet": ["puppet"],
-    "helm": ["helm"],
-    "istio": ["istio", "service mesh"],
-    "prometheus": ["prometheus", "grafana", "monitoring"],
-    "logging": ["elk", "elasticsearch", "logstash", "kibana", "splunk"],
-    "cloud aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "cloudformation", "iam", "dynamodb"],
-    "cloud azure": ["azure", "microsoft azure", "azure functions", "azure devops", "arm templates"],
-    "cloud gcp": ["gcp", "google cloud", "google cloud platform", "gce", "bigquery", "cloud functions"],
-    "openstack": ["openstack"],
-    "serverless": ["serverless", "faas"],
-    "edge computing": ["edge computing"],
-    "networking": ["networking", "dns", "http", "tcp/ip"],
-    "security": ["security", "kubernetes security", "oauth2", "jwt", "tls", "ssl", "vault"],
-    "git": ["git", "gitlab", "github", "bitbucket"],
-    "ci tools": ["jenkins", "circleci", "travis ci", "github actions", "gitlab ci", "azure pipelines"],
-    "jira": ["jira", "confluence"],
-    "slack": ["slack"],
-    "docker-compose": ["docker-compose", "compose"],
-    "testing": ["testing", "unit test", "integration test", "pytest", "junit", "mocha", "jest"],
-    "performance": ["performance", "profiling", "benchmark"],
-    "cache": ["cache", "redis", "memcached"],
-    "microservices architecture": ["microservices architecture", "soa", "service mesh"],
-    "design patterns": ["design patterns", "solid", "ddd", "clean architecture"],
-    "architecture": ["architecture", "system design", "scalability", "high availability"],
-    "agile": ["agile", "scrum", "kanban"],
-    "devsecops": ["devsecops", "security as code", "shift left"],
-    "observability": ["observability", "opentelemetry", "logging", "tracing", "metrics"]
-};
+
 
 function populateFilters() {
     const companies = new Set();
@@ -407,7 +336,7 @@ function computeMatch(jobs) {
 
     // Filter by last 30days
     const days_old = 90;
-    const cutoff_date = new Date(Date.now() - days_old * 24 *60 * 60 * 1000);
+    const cutoff_date = new Date(Date.now() - days_old * 24 * 60 * 60 * 1000);
     const recent = jobs.filter(job => {
         const raw = job.job_posted_date || job.posted_date; // be robust
         if (!raw) return false;
@@ -415,7 +344,7 @@ function computeMatch(jobs) {
         return !isNaN(d) && d >= cutoff_date;
     });
     const top = recent.slice(0, 50); // 
-    
+
 
     const jobResults = document.getElementById("jobResults");
     if (jobResults) {
@@ -426,6 +355,27 @@ function computeMatch(jobs) {
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
             const applyLink = job.job_url || '#';
+
+            // Sanitize and prepare values for safe insertion into HTML
+            const safeTitle = escapeHtml(title);
+            const safeCompany = escapeHtml(company);
+            const safeLocation = escapeHtml(location);
+            const safeJobType = escapeHtml(jobType);
+            const safeSeniority = escapeHtml(seniority);
+            const safeSummary = escapeHtml(job.job_summary || '');
+
+            // Validate apply URL: allow http(s) or relative URLs, otherwise fallback to '#'
+            let safeApply = '#';
+            try {
+                if (typeof applyLink === 'string' && applyLink.trim()) {
+                    const l = applyLink.trim();
+                    if (/^https?:\/\//i.test(l) || /^\//.test(l) || /^\.\//.test(l)) {
+                        safeApply = l;
+                    }
+                }
+            } catch (e) {
+                safeApply = '#';
+            }
 
             // Parses posted date
             let postedRaw = job.job_posted_date;
@@ -468,6 +418,12 @@ function computeMatch(jobs) {
                         </div>
 
                         ${job.job_summary ? `<div class="job-summary text-muted mt-2">${job.job_summary}</div>` : ''}
+                        
+                        ${job.job_description ? `
+                        <details class="mt-3">
+                            <summary class="text-primary" style="cursor:pointer;"><i class="bi bi-info-circle me-1"></i>Job Description</summary>
+                            <div class="job-description text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(job.job_description)}</div>
+                        </details>` : ''}
                     </div>
                     
                     <div class="col-md-2 d-flex flex-column align-items-end justify-content-between">
@@ -475,7 +431,7 @@ function computeMatch(jobs) {
                             ${job.match_score.toFixed(0)}% Match
                         </span>
                         <div class="mt-3">
-                             <a href="${applyLink}" target="_blank" class="btn btn-apply btn-sm text-decoration-none">Apply</a>
+                             <button type="button" data-link="${safeApply}" class="btn btn-apply btn-sm text-decoration-none">Apply</button>
                         </div>
                     </div>
                 </div>
@@ -511,14 +467,55 @@ function inferJobTypes(resume) {
         'Intern / Entry Level': ['intern', 'internship', 'entry level', 'graduate', 'student']
     };
 
-    // Industry to role mapping
+    // Industry to role mapping (expanded)
+    // Keys should be lower-case tokens expected to appear in resume industries text.
     const industryRoleMap = {
-        'software': ['Software Engineer'],
-        'technology': ['Software Engineer', 'Data / ML'],
-        'education': ['Education / Teaching'],
-        'health': ['Healthcare'],
-        'finance': ['Data / ML', 'Finance'],
-        'research': ['Research']
+        'software': ['Software Engineer', 'DevOps / Platform', 'Frontend Engineer', 'Backend Engineer', 'Full Stack Engineer'],
+        'technology': ['Software Engineer', 'Data / ML', 'Product / PM', 'Site Reliability Engineer', 'Technical Program Manager'],
+        'internet': ['Software Engineer', 'Product / PM', 'Growth / Marketing', 'Data / ML'],
+        'ecommerce': ['Product / PM', 'Growth / Marketing', 'Data / ML', 'Supply Chain', 'Operations'],
+        'retail': ['Merchandising', 'Operations', 'Sales', 'Business Analyst'],
+        'education': ['Education / Teaching', 'Instructional Designer', 'Training Specialist'],
+        'health': ['Healthcare', 'Clinical Research', 'Health Data Analyst', 'Nursing', 'Medical'],
+        'healthcare': ['Healthcare', 'Clinical Research', 'Health Data Analyst', 'Nursing', 'Medical'],
+        'pharma': ['Clinical Research', 'Regulatory Affairs', 'Data / ML', 'Biostatistician'],
+        'biotech': ['Research', 'Clinical Research', 'Data / ML', 'Bioinformatics'],
+        'finance': ['Finance', 'Data / ML', 'Quantitative Analyst', 'Risk'],
+        'banking': ['Finance', 'Risk', 'Compliance', 'Data / ML'],
+        'insurance': ['Actuarial', 'Claims', 'Finance', 'Data / ML'],
+        'research': ['Research', 'Research Scientist', 'R&D', 'Lab Technician'],
+        'manufacturing': ['Operations', 'Supply Chain', 'Quality', 'Engineering'],
+        'construction': ['Project Management', 'Site Engineer', 'Operations'],
+        'energy': ['Engineering', 'Operations', 'Data / ML', 'Renewables Specialist'],
+        'telecom': ['Network Engineer', 'Software Engineer', 'Systems Engineer'],
+        'media': ['Content', 'Product / PM', 'Marketing', 'Design'],
+        'advertising': ['Marketing', 'Account Management', 'Creative'],
+        'marketing': ['Marketing', 'Growth / Performance', 'Product / PM', 'Content'],
+        'legal': ['Legal', 'Compliance', 'Paralegal'],
+        'hospitality': ['Operations', 'Customer Support', 'Sales'],
+        'travel': ['Operations', 'Customer Experience', 'Product / PM'],
+        'transportation': ['Logistics', 'Operations', 'Supply Chain', 'Transportation Planner'],
+        'logistics': ['Logistics', 'Supply Chain', 'Operations'],
+        'automotive': ['Engineering', 'Product / PM', 'Manufacturing'],
+        'aerospace': ['Engineering', 'Research', 'Systems Engineer'],
+        'defense': ['Engineering', 'Systems', 'Research'],
+        'consulting': ['Consultant', 'Business Analyst', 'Strategy'],
+        'nonprofit': ['Program Manager', 'Fundraising', 'Operations'],
+        'government': ['Policy', 'Program Manager', 'Operations', 'Compliance'],
+        'finance-tech': ['Data / ML', 'FinTech Engineer', 'Product / PM'],
+        'semiconductor': ['Hardware Engineer', 'ASIC Engineer', 'Test Engineer'],
+        'hardware': ['Hardware Engineer', 'Embedded Engineer', 'Firmware'],
+        'security': ['Security Engineer', 'Security Analyst', 'SRE'],
+        'cybersecurity': ['Security Engineer', 'Security Analyst', 'Incident Response'],
+        'gaming': ['Game Developer', 'Graphics Engineer', 'Product / PM', 'Design'],
+        'sports': ['Operations', 'Marketing', 'Product / PM'],
+        'entertainment': ['Content', 'Marketing', 'Product / PM'],
+        'real estate': ['Sales', 'Property Management', 'Operations'],
+        'analytics': ['Data / ML', 'Data Analyst', 'BI Analyst'],
+        'data': ['Data / ML', 'Data Engineer', 'Data Scientist'],
+        'ai': ['Data / ML', 'ML Engineer', 'Research Scientist'],
+        'startup': ['Generalist', 'Product / PM', 'Growth', 'Engineering'],
+        'venture': ['Investor', 'Platform', 'Operations']
     };
 
     const roles = [];
@@ -664,11 +661,12 @@ function initApplyModal() {
     const jobResults = document.getElementById('jobResults');
     if (jobResults) {
         jobResults.addEventListener('click', (e) => {
-            const btn = e.target.closest('.apply-btn');
+            const btn = e.target.closest('.btn-apply');
             if (!btn) return;
-            const link = btn.getAttribute('data-link') || '#';
-            const title = btn.getAttribute('data-title') || 'Job';
-            const company = btn.getAttribute('data-company') || '';
+            const card = btn.closest('.job-card');
+            const link = btn.getAttribute('data-link') || btn.getAttribute('href') || '#';
+            const title = card?.querySelector('.job-title-link')?.textContent?.trim() || 'Job';
+            const company = card?.querySelector('.company-name')?.textContent?.trim() || '';
             showApplyModal(link, title, company);
         });
     }
