@@ -32,34 +32,6 @@ async function loadResume() {
     // 1) Legacy object: { name, email, education, skills: [] }
     // 2) Parser output with inputs: [{ ...fields... }]
     let raw = JSON.parse(data);
-
-    // Helper to normalize skills
-    function normalizeSkills(skillsArr) {
-        const skill_dict = SKILL_DICT;
-        const lowered = skillsArr.map(s => String(s).toLowerCase());
-        const out = new Set();
-        lowered.forEach(s => {
-            // Direct match
-            if (skill_dict[s]) {
-                out.add(s);
-                return;
-            }
-            // Checks aliases
-            for (const canonical in skill_dict) {
-                const aliases = skill_dict[canonical];
-                for (let i = 0; i < aliases.length; i++) {
-                    if (aliases[i] && s.indexOf(aliases[i]) !== -1) {
-                        out.add(canonical);
-                        return;
-                    }
-                }
-            }
-            // Fallback: adds original token
-            if (s) out.add(s);
-        });
-        return Array.from(out);
-    }
-
     let resume = raw;
     if (raw && raw.inputs && Array.isArray(raw.inputs) && raw.inputs.length) {
         // Uses first input record
@@ -84,6 +56,31 @@ async function loadResume() {
         // Normalizes skills to canonical names
         const skill_dict = SKILL_DICT;
 
+        function normalizeSkills(skillsArr) {
+            const lowered = skillsArr.map(s => String(s).toLowerCase());
+            const out = new Set();
+            lowered.forEach(s => {
+                // Direct match
+                if (skill_dict[s]) {
+                    out.add(s);
+                    return;
+                }
+                // Checks aliases
+                for (const canonical in skill_dict) {
+                    const aliases = skill_dict[canonical];
+                    for (let i = 0; i < aliases.length; i++) {
+                        if (aliases[i] && s.indexOf(aliases[i]) !== -1) {
+                            out.add(canonical);
+                            return;
+                        }
+                    }
+                }
+                // Fallback: adds original token
+                if (s) out.add(s);
+            });
+            return Array.from(out);
+        }
+
         resume.skills = normalizeSkills(resume.skills);
     } else {
         // Normalizes legacy shape
@@ -93,7 +90,6 @@ async function loadResume() {
         if (!Array.isArray(resume.skills)) {
             resume.skills = typeof resume.skills === 'string' ? resume.skills.split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean) : [];
         }
-        resume.skills = normalizeSkills(resume.skills);
     }
 
     window.resumeData = resume;
@@ -358,7 +354,7 @@ function computeMatch(jobs) {
             const location = job.job_location || 'N/A';
             const jobType = job.job_employment_type || 'N/A';
             const seniority = job.job_seniority_level || 'N/A';
-            const applyLink = job.url;
+            const applyLink = job.job_url || '#';
 
             // Sanitize and prepare values for safe insertion into HTML
             const safeTitle = escapeHtml(title);
@@ -385,8 +381,22 @@ function computeMatch(jobs) {
             let postedRaw = job.job_posted_date;
             const postedRelative = timeAgo(postedRaw);
 
+            const salary = job.salary || '';
+
             // Formats salary
-            let salaryDisplay = job.job_base_pay_range || '';
+            let salaryDisplay = '';
+            if (typeof salary === 'string' && salary.trim()) salaryDisplay = salary;
+            else if (typeof salary === 'object' && salary !== null) {
+                const min = salary.min || salary.min_salary || salary.salary_min;
+                const max = salary.max || salary.max_salary || salary.salary_max;
+                if (min || max) salaryDisplay = `$${min || '?'} - $${max || '?'} `;
+            }
+
+            // Match score color
+            let matchColor = 'bg-secondary';
+            if (job.match_score >= 70) matchColor = 'bg-success';
+            else if (job.match_score >= 40) matchColor = 'bg-warning text-dark';
+
             return `
             <div class="card job-card mb-3 p-3">
                 <div class="row g-0">
@@ -403,7 +413,7 @@ function computeMatch(jobs) {
                         <div class="mb-2 metadata-text">
                             ${jobType !== 'N/A' ? `<span class="me-3"><i class="bi bi-briefcase-fill me-1"></i>${jobType}</span>` : ''}
                             ${seniority !== 'N/A' ? `<span class="me-3"><i class="bi bi-bar-chart-fill me-1"></i>${seniority}</span>` : ''}
-                            ${salaryDisplay ? `<span class="me-3 fw-bold text-dark"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
+                            ${salaryDisplay ? `<span class="me-3"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
                             <span class="text-success"><i class="bi bi-clock-history me-1"></i>${postedRelative}</span>
                         </div>
 
