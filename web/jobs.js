@@ -155,7 +155,7 @@ async function loadResume() {
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-success" role="alert">
-                    Loaded ${window.jobData.length} jobs from live database.
+                    Successfully loaded jobs from live database.
                 </div>`;
         }
     } catch (err) {
@@ -413,7 +413,7 @@ function computeMatch(jobs) {
 
                 // Summary Fix: truncate logic
                 let summaryText = fixEncoding(job.job_summary || '');
-                const MAX_SUMMARY_LEN = 250;
+                const MAX_SUMMARY_LEN = 550;
                 if (summaryText.length > MAX_SUMMARY_LEN) {
                     summaryText = summaryText.substring(0, MAX_SUMMARY_LEN) + '...';
                 }
@@ -618,7 +618,7 @@ function populateJobTypeInsights(insights) {
         roles.forEach(r => {
             const safe = escapeHtml(r.name);
             const id = 'role_' + safe.replace(/\s+/g, '_');
-            parts.push(`< label class="form-check form-check-inline mb-1" > <input class="form-check-input jobtype-role" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-primary ms-1">${r.score}%</span></span></label>`);
+            parts.push(`<label class="form-check form-check-inline mb-1"><input class="form-check-input jobtype-role" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-primary ms-1">${r.score}%</span></span></label>`);
         });
         parts.push('</div></div>');
     }
@@ -629,7 +629,7 @@ function populateJobTypeInsights(insights) {
         employment.forEach(e => {
             const safe = escapeHtml(e.name);
             const id = 'emp_' + safe.replace(/\s+/g, '_');
-            parts.push(`< label class="form-check form-check-inline mb-1" > <input class="form-check-input jobtype-emp" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-secondary ms-1">${e.score}%</span></span></label>`);
+            parts.push(`<label class="form-check form-check-inline mb-1"><input class="form-check-input jobtype-emp" type="checkbox" id="${id}" value="${safe}"> <span class="form-check-label">${safe} <span class="badge bg-secondary ms-1">${e.score}%</span></span></label>`);
         });
         parts.push('</div></div>');
     }
