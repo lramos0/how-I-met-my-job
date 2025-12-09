@@ -232,6 +232,7 @@ function extractEducation(text) {
 
     const contains = (regex) => regex.test(text);
 
+
     // ============================================================
     //                       PH.D / DOCTORAL
     // ============================================================
@@ -249,12 +250,12 @@ function extractEducation(text) {
         /\blaw school\b/,
 
         // Medical / Clinical doctor-level
-        /\bmd\b|\bm\.?\s*d\.?\b/,                             // MD
+        /\bm\.?\s*d\.?\b/,                                    // M.D.
         /\bdo\b(?!\b.*not)/,                                  // DO (doctor of osteopathy)
         /\bd\.?\s*d\.?\s*s\.?\b/,                             // DDS
-        /\bdmd\b/,                                            // DMD dentistry
+        /\bd\.?\s*m\.?\s*s\.?\b/,                             // DMS
+        /\bd\.?\s*n\.?\s*p\.?\b/,                             // DNP
         /\bpharmd\b/,                                         // PharmD
-        /\bdnp\b/,                                            // Doctor of Nursing Practice
         /\bpsy\.?\s*d\.?\b|\bpsychology doctorate\b/,
         /\bjunior doctor\b/
     ];
@@ -278,7 +279,7 @@ function extractEducation(text) {
         /\bm\.?ed\.?\b/,
 
         // Nursing
-        /\bmsn\b/,                    // Masters in Nursing
+        /\bm\.?\s*s\.?\s*n\.?\b/,     // MSN
         /\bnurse practitioner\b/,     // NP usually masters-level
     ];
 
