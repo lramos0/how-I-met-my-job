@@ -339,6 +339,32 @@ function computeMatch(jobs) {
 
         job.match_score = resumeSkills.length ? (matchedCount / resumeSkills.length) * 100 : 0;
         job.matched_skills = matched;
+
+        // --- Competitiveness / Capacity Logic ---
+        // Normalized 0-10 scale
+        const jobDifficulty = (job.competitiveness_score !== undefined && job.competitiveness_score !== null)
+            ? Number(job.competitiveness_score)
+            : 5; // Default middle
+
+        const userCompetitiveness = (window.resumeData.competitiveness_score !== undefined && window.resumeData.competitiveness_score !== null)
+            ? Number(window.resumeData.competitiveness_score)
+            : 5; // Default middle
+
+        const gap = userCompetitiveness - jobDifficulty; // Positive = Candidate is stronger
+        job.gap_score = gap;
+
+        let capacityLabel = 'Target';
+        let capacityColor = 'bg-success';
+
+        if (gap < -2) {
+            capacityLabel = 'Reach';
+            capacityColor = 'bg-danger';
+        } else if (gap > 2) {
+            capacityLabel = 'Comfortable';
+            capacityColor = 'bg-info text-dark';
+        }
+        job.capacity_label = capacityLabel;
+        job.capacity_color = capacityColor;
     });
 
     // Custom Sort Logic
@@ -355,6 +381,9 @@ function computeMatch(jobs) {
         });
     } else if (sortBy === 'salary_high') {
         jobs.sort((a, b) => (b.job_base_pay_range || '').localeCompare(a.job_base_pay_range || ''));
+    } else if (sortBy === 'capacity') {
+        // Sort by gap closest to 0 (Best Fit)
+        jobs.sort((a, b) => Math.abs(a.gap_score) - Math.abs(b.gap_score));
     }
 
     // Filter by last 90days
@@ -443,6 +472,9 @@ function computeMatch(jobs) {
                         <div class="col-md-3 text-end d-flex flex-column gap-2 align-items-end">
                             <span class="badge ${matchColor} match-badge">
                                 <i class="bi bi-stars me-1"></i>${job.match_score.toFixed(0)}% Match
+                            </span>
+                            <span class="badge ${job.capacity_color} match-badge" title="Capacity Fit (0 is perfect)">
+                                <i class="bi bi-person-check me-1"></i>${job.capacity_label}
                             </span>
                             <a href="${safeApply}" target="_blank" class="btn btn-outline-primary btn-sm w-100 mt-2">Apply Now</a>
                         </div>
@@ -668,7 +700,7 @@ function fixEncoding(str) {
         .replace(/â€¦/g, "…");
 }
 
-// Escapes HTML
+// Escapes HTML to prevent accidental injection and/or XSS attacks
 function escapeHtml(str) {
     return String(str).replace(/[&"'<>]/g, function (s) {
         return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
