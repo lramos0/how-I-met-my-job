@@ -700,7 +700,7 @@ function fixEncoding(str) {
         .replace(/â€¦/g, "…");
 }
 
-// Escapes HTML
+// Escapes HTML to prevent accidental injection and/or XSS attacks
 function escapeHtml(str) {
     return String(str).replace(/[&"'<>]/g, function (s) {
         return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
