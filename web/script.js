@@ -230,32 +230,45 @@ function extractEducation(text) {
     const original = text;
     text = text.toLowerCase();
 
-    // ---------- Helper: safe negative filters ----------
+    // ---------- Helper ----------
     const contains = (regex) => regex.test(text);
 
-    // ---------- PhD ----------
+    // ============================================================
+    //                       PH.D / DOCTORAL
+    // ============================================================
     const phdRegex = [
-        /\bph\.?\s*d\.?\b/,                                // PhD / Ph.D.
-        /\bdoctorate\b/,                                   // doctorate
-        /\bdoctor of philosophy\b/,                        // Doctor of Philosophy
-        /\bdphil\b/,                                       // DPhil (Oxford)
-        /\bsc\.?\s*d\.?\b/                                 // ScD
+        /\bph\.?\s*d\.?\b/,                                   // PhD / Ph.D.
+        /\bdoctorate\b/,                                      // doctorate
+        /\bdoctor of philosophy\b/,                           // Doctor of Philosophy
+        /\bdphil\b/,                                          // DPhil
+        /\bsc\.?\s*d\.?\b/,                                   // ScD
+
+        // NEW:
+        /\bj\.?\s*d\.?\b/,                                    // JD / J.D.
+        /\bjuris doctor\b/,                                   // Juris Doctor
+        /\blaw school\b/,                                     // law school (interpret as JD)
+
+        /\bmd\b|\bm\.?\s*d\.?\b/,                             // MD / M.D.
+        /\bdoctor of medicine\b/,                             // doctor of medicine
+        /\bjunior doctor\b/                                   // "junior doctor" (doctor-level)
     ];
 
     if (phdRegex.some(r => r.test(text))) {
-        return "PhD";
+        return "Doctorate";
     }
 
-    // ---------- Master ----------
+    // ============================================================
+    //                          MASTER
+    // ============================================================
     const masterPositive = [
-        /\bmaster['’]s\b/,                                 // master's
-        /\bmaster of\b/,                                   // master of science
-        /\bms\b|\bm\.?\s*s\.?\b/,                          // MS / M.S.
-        /\bma\b|\bm\.?\s*a\.?\b/,                          // MA
-        /\bmsc\b/,                                         // MSc
-        /\bmba\b/,                                         // MBA
-        /\bmeng\b|\bm\.?\s*eng\.?\b/,                      // MEng
-        /\bm\.?ed\.?\b/                                    // MEd
+        /\bmaster['’]s\b/,                                    // master's
+        /\bmaster of\b/,                                      // master of X
+        /\bms\b|\bm\.?\s*s\.?\b/,                             // MS / M.S.
+        /\bma\b|\bm\.?\s*a\.?\b/,                             // MA / M.A.
+        /\bmsc\b/,                                            // MSc
+        /\bmba\b/,                                            // MBA
+        /\bmeng\b|\bm\.?\s*eng\.?\b/,                         // MEng
+        /\bm\.?ed\.?\b/                                       // MEd
     ];
 
     const masterNegative = [
@@ -270,15 +283,21 @@ function extractEducation(text) {
         return "Master";
     }
 
-    // ---------- Bachelor ----------
+    // ============================================================
+    //                          BACHELOR
+    // ============================================================
     const bachelorPositive = [
-        /\bbachelor['’]s\b/,                               // bachelor's
-        /\bbachelor of\b/,                                 // bachelor of science
-        /\bbs\b|\bb\.?\s*s\.?\b/,                          // BS / B.S.
-        /\bba\b|\bb\.?\s*a\.?\b/,                          // BA
-        /\bbsc\b/,                                         // BSc
-        /\bbfa\b/,                                         // BFA
-        /\bbeng\b/                                         // BEng
+        /\bbachelor['’]s\b/,                                  // bachelor's
+        /\bbachelor of\b/,                                    // bachelor of X
+
+        /\bbs\b|\bb\.?\s*s\.?\b/,                             // BS / B.S.
+        /\bba\b|\bb\.?\s*a\.?\b/,                             // BA / B.A.
+        /\bbsc\b/,                                            // BSc
+        /\bbfa\b/,                                            // BFA
+        /\bbeng\b/,                                           // BEng
+
+        // NEW:
+        /\bbe\b|\bb\.?\s*e\.?\b/,                             // BE / B.E / B.E.
     ];
 
     const bachelorNegative = [
