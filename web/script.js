@@ -227,9 +227,72 @@ function extractLocation(text) {
 }
 
 function extractEducation(text) {
-    if (/master|m\.?s\.?\b/i.test(text)) return "Master";
-    if (/bachelor|b\.?s\.?\b/i.test(text)) return "Bachelor";
-    if (/ph\.?d|doctor/i.test(text)) return "PhD";
+    const original = text;
+    text = text.toLowerCase();
+
+    // ---------- Helper: safe negative filters ----------
+    const contains = (regex) => regex.test(text);
+
+    // ---------- PhD ----------
+    const phdRegex = [
+        /\bph\.?\s*d\.?\b/,                                // PhD / Ph.D.
+        /\bdoctorate\b/,                                   // doctorate
+        /\bdoctor of philosophy\b/,                        // Doctor of Philosophy
+        /\bdphil\b/,                                       // DPhil (Oxford)
+        /\bsc\.?\s*d\.?\b/                                 // ScD
+    ];
+
+    if (phdRegex.some(r => r.test(text))) {
+        return "PhD";
+    }
+
+    // ---------- Master ----------
+    const masterPositive = [
+        /\bmaster['’]s\b/,                                 // master's
+        /\bmaster of\b/,                                   // master of science
+        /\bms\b|\bm\.?\s*s\.?\b/,                          // MS / M.S.
+        /\bma\b|\bm\.?\s*a\.?\b/,                          // MA
+        /\bmsc\b/,                                         // MSc
+        /\bmba\b/,                                         // MBA
+        /\bmeng\b|\bm\.?\s*eng\.?\b/,                      // MEng
+        /\bm\.?ed\.?\b/                                    // MEd
+    ];
+
+    const masterNegative = [
+        /\b(master bedroom|master plan|master key)\b/,
+        /\b(headmaster|grandmaster|master electrician)\b/
+    ];
+
+    if (
+        masterPositive.some(r => r.test(text)) &&
+        !masterNegative.some(r => r.test(text))
+    ) {
+        return "Master";
+    }
+
+    // ---------- Bachelor ----------
+    const bachelorPositive = [
+        /\bbachelor['’]s\b/,                               // bachelor's
+        /\bbachelor of\b/,                                 // bachelor of science
+        /\bbs\b|\bb\.?\s*s\.?\b/,                          // BS / B.S.
+        /\bba\b|\bb\.?\s*a\.?\b/,                          // BA
+        /\bbsc\b/,                                         // BSc
+        /\bbfa\b/,                                         // BFA
+        /\bbeng\b/                                         // BEng
+    ];
+
+    const bachelorNegative = [
+        /\bbachelor party\b/,
+        /\bbachelor pad\b/
+    ];
+
+    if (
+        bachelorPositive.some(r => r.test(text)) &&
+        !bachelorNegative.some(r => r.test(text))
+    ) {
+        return "Bachelor";
+    }
+
     return "Unknown";
 }
 
