@@ -226,12 +226,6 @@ function extractLocation(text) {
     return match ? match[0] : "Unknown";
 }
 
-function extractEducation(text) {
-    if (/master|m\.?s\.?\b/i.test(text)) return "Master";
-    if (/bachelor|b\.?s\.?\b/i.test(text)) return "Bachelor";
-    if (/ph\.?d|doctor/i.test(text)) return "PhD";
-    return "Unknown";
-}
 
 async function extractSkills(text) {
     const dict = await ensureSkillDict();
