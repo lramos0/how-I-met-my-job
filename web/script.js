@@ -200,7 +200,6 @@ function displayParsedResume() {
     if (!outputDiv) return;
 
     outputDiv.innerHTML = `
-        <b>Name:</b> ${rec.full_name}<br>
         <b>Location:</b> ${rec.location}<br>
         <b>Education:</b> ${rec.education_level}<br>
         <b>Years Experience:</b> ${rec.years_experience}<br>
@@ -292,20 +291,6 @@ function extractAchievements(text) {
     if (/dean('|’)s list/i.test(text)) achievements.push("Dean's List");
     if (/chancellor('|’)s list/i.test(text)) achievements.push("Chancellor's List");
     return achievements;
-}
-
-/* --------------------------------------------------------
-   DOWNLOAD + NAVIGATION
---------------------------------------------------------- */
-function downloadJSON() {
-    const blob = new Blob([JSON.stringify(resumeJSON, null, 2)], {
-        type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "parsed_resume.json";
-    a.click();
 }
 
 function goToJobsPage() {
