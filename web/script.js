@@ -230,7 +230,6 @@ function extractEducation(text) {
     const original = text;
     text = text.toLowerCase();
 
-    // ---------- Helper ----------
     const contains = (regex) => regex.test(text);
 
     // ============================================================
@@ -238,19 +237,26 @@ function extractEducation(text) {
     // ============================================================
     const phdRegex = [
         /\bph\.?\s*d\.?\b/,                                   // PhD / Ph.D.
-        /\bdoctorate\b/,                                      // doctorate
-        /\bdoctor of philosophy\b/,                           // Doctor of Philosophy
-        /\bdphil\b/,                                          // DPhil
+        /\bdoctorate\b/,
+        /\bdoctor of\b/,
+        /\bdoctors in\b/,
+        /\bdphil\b/,
         /\bsc\.?\s*d\.?\b/,                                   // ScD
 
-        // NEW:
-        /\bj\.?\s*d\.?\b/,                                    // JD / J.D.
-        /\bjuris doctor\b/,                                   // Juris Doctor
-        /\blaw school\b/,                                     // law school (interpret as JD)
+        // Law / JD
+        /\bj\.?\s*d\.?\b/,
+        /\bjuris doctor\b/,
+        /\blaw school\b/,
 
-        /\bmd\b|\bm\.?\s*d\.?\b/,                             // MD / M.D.
-        /\bdoctor of medicine\b/,                             // doctor of medicine
-        /\bjunior doctor\b/                                   // "junior doctor" (doctor-level)
+        // Medical / Clinical doctor-level
+        /\bmd\b|\bm\.?\s*d\.?\b/,                             // MD
+        /\bdo\b(?!\b.*not)/,                                  // DO (doctor of osteopathy)
+        /\bd\.?\s*d\.?\s*s\.?\b/,                             // DDS
+        /\bdmd\b/,                                            // DMD dentistry
+        /\bpharmd\b/,                                         // PharmD
+        /\bdnp\b/,                                            // Doctor of Nursing Practice
+        /\bpsy\.?\s*d\.?\b|\bpsychology doctorate\b/,
+        /\bjunior doctor\b/
     ];
 
     if (phdRegex.some(r => r.test(text))) {
@@ -261,14 +267,19 @@ function extractEducation(text) {
     //                          MASTER
     // ============================================================
     const masterPositive = [
-        /\bmaster['’]s\b/,                                    // master's
-        /\bmaster of\b/,                                      // master of X
-        /\bms\b|\bm\.?\s*s\.?\b/,                             // MS / M.S.
-        /\bma\b|\bm\.?\s*a\.?\b/,                             // MA / M.A.
-        /\bmsc\b/,                                            // MSc
-        /\bmba\b/,                                            // MBA
-        /\bmeng\b|\bm\.?\s*eng\.?\b/,                         // MEng
-        /\bm\.?ed\.?\b/                                       // MEd
+        /\bmaster['’]s\b/,
+        /\bmaster of\b/,
+
+        /\bms\b|\bm\.?\s*s\.?\b/,
+        /\bma\b|\bm\.?\s*a\.?\b/,
+        /\bmsc\b/,
+        /\bmba\b/,
+        /\bmeng\b|\bm\.?\s*eng\.?\b/,
+        /\bm\.?ed\.?\b/,
+
+        // Nursing
+        /\bmsn\b/,                    // Masters in Nursing
+        /\bnurse practitioner\b/,     // NP usually masters-level
     ];
 
     const masterNegative = [
@@ -287,17 +298,19 @@ function extractEducation(text) {
     //                          BACHELOR
     // ============================================================
     const bachelorPositive = [
-        /\bbachelor['’]s\b/,                                  // bachelor's
-        /\bbachelor of\b/,                                    // bachelor of X
+        /\bbachelor['’]s\b/,
+        /\bbachelor of\b/,
 
-        /\bbs\b|\bb\.?\s*s\.?\b/,                             // BS / B.S.
-        /\bba\b|\bb\.?\s*a\.?\b/,                             // BA / B.A.
-        /\bbsc\b/,                                            // BSc
-        /\bbfa\b/,                                            // BFA
-        /\bbeng\b/,                                           // BEng
+        /\bbs\b|\bb\.?\s*s\.?\b/,
+        /\bba\b|\bb\.?\s*a\.?\b/,
+        /\bbsc\b/,
+        /\bbfa\b/,
+        /\bbeng\b/,
 
-        // NEW:
-        /\bbe\b|\bb\.?\s*e\.?\b/,                             // BE / B.E / B.E.
+        /\bbe\b|\bb\.?\s*e\.?\b/,
+
+        // Nursing
+        /\bbsn\b/, // Bachelor of Science in Nursing
     ];
 
     const bachelorNegative = [
@@ -307,11 +320,110 @@ function extractEducation(text) {
 
     if (
         bachelorPositive.some(r => r.test(text)) &&
-        !bachelorNegative.some(r => r.test(text))
+        !bachelorNegative.some(r.test(text))
     ) {
         return "Bachelor";
     }
 
+    // ============================================================
+    //                    ASSOCIATES DEGREE
+    // ============================================================
+    const associateRegex = [
+        /\bassociate['’]s\b/,
+        /\bassociate of\b/,
+        /\baa\b\b|\ba\.?\s*a\.?\b/,
+        /\bas\b\b|\ba\.?\s*s\.?\b/,
+        /\baas\b/,      // Associate of Applied Science
+        /\baos\b/,      // Associate of Occupational Studies
+    ];
+
+    if (associateRegex.some(r => r.test(text))) {
+        return "Associate";
+    }
+
+    // ============================================================
+    //                      NURSING PROGRAMS
+    // ============================================================
+    const nursingRegex = [
+        /\brn\b(?!\w)/,                 // RN
+        /\blicensed practical nurse\b/,
+        /\blicensed vocational nurse\b/,
+        /\blpn\b|\blvn\b/,
+        /\bcna\b/,                      // Certified Nursing Assistant
+        /\bpnp\b/,                      // Pediatric NP (if not classified above)
+        /\baprn\b/,                     // advanced practice nurse
+    ];
+
+    if (nursingRegex.some(r => r.test(text))) {
+        return "Nursing Program";
+    }
+
+    // ============================================================
+    //                          TRADE SCHOOL
+    // ============================================================
+    const tradeSchoolRegex = [
+        /\btrade school\b/,
+        /\btechnical school\b/,
+        /\btech school\b/,
+        /\bcommunity college certificate\b/,
+
+        // Trade occupations
+        /\bhvac\b/,
+        /\bwelding\b|\bweld(er|ing)\b/,
+        /\belectrician\b/,
+        /\bplumbing\b|\bplumber\b/,
+        /\bcarpentry\b|\bcarpenter\b/,
+        /\bautomotive\b/,
+        /\bmechanic training\b/,
+        /\bcosmetology\b/,
+        /\bculinary school\b/,
+    ];
+
+    if (tradeSchoolRegex.some(r => r.test(text))) {
+        return "Trade School / Vocational";
+    }
+
+    // ============================================================
+    //                  MILITARY EDUCATION / TRAINING
+    // ============================================================
+    const militaryRegex = [
+        /\bmilitary training\b/,
+        /\barmy education\b/,
+        /\bnavy school\b/,
+        /\bair force academy\b/,
+        /\bmarine corps school\b/,
+        /\bcoast guard school\b/,
+        /\bboot camp\b/,
+        /\bmos school\b/,             // Army MOS training
+        /\brate school\b/,            // Navy rate training
+        /\bmilitary occupational specialty\b/,
+    ];
+
+    if (militaryRegex.some(r => r.test(text))) {
+        return "Military Education / Training";
+    }
+
+    // ============================================================
+    //                  CERTIFICATIONS / TRAINING PROGRAMS
+    // ============================================================
+    const certificateRegex = [
+        /\bcertificate\b/,
+        /\bcertification\b/,
+        /\bcertified\b/,
+        /\btraining program\b/,
+        /\bprofessional training\b/,
+        /\bcontinuing education\b/,
+        /\bbootcamp\b/,
+        /\bworkshop\b/,
+    ];
+
+    if (certificateRegex.some(r => r.test(text))) {
+        return "Certificate / Training Program";
+    }
+
+    // ============================================================
+    //                         FALLBACK
+    // ============================================================
     return "Unknown";
 }
 
