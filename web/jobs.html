@@ -3,127 +3,136 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>🎯 Job Matching Dashboard</title>
+    <title>Job Dashboard | MeWannaJob</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@450" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="bg-light">
-    <div class="container py-5">
-        <h2 class="text-center fw-bold mb-4">🎯 Job Matching Dashboard</h2>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-custom sticky-top mb-4">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
+                <i class="bi bi-briefcase-fill text-primary"></i>
+                MeWannaJob
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <a href="index.html" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-upload me-1"></i> New Resume
+                </a>
+            </div>
+        </div>
+    </nav>
 
-        <!-- Data / status message -->
-        <div id="dataMessage" class="mb-3"></div>
+    <div class="container pb-5">
+        <!-- Status Messages -->
+        <div id="dataMessage"></div>
 
-        <!-- Resume, Search, Filters, Results -->
-        <div class="card p-2 shadow-sm mb-3 compact">
-            <div class="row align-items-center g-2">
-                <div class="col-md-4">
-                    <h6 class="fw-bold mb-1">🧾 Resume</h6>
-                    <!-- Resume details toggle -->
-                    <details id="resumeDetails" class="bg-light p-2 border rounded small" open>
-                        <summary class="mb-2" style="cursor:pointer">Show / hide details</summary>
-                        <div id="resumeSummary" class="mt-1"></div>
-                        <!-- Inferred job types -->
-                        <div id="jobTypeInsights" class="mt-3 small"></div>
-                    </details>
-                </div>
-                <div class="col-md-8">
-                    <div class="d-flex align-items-center gap-2">
-                        <input type="text" id="globalSearch" class="form-control form-control-sm"
-                            placeholder="Search jobs by title, company, location..." aria-label="Global job search">
-                        <button class="btn btn-primary btn-sm" type="button"
-                            onclick="performGlobalSearch()">Search</button>
+        <div class="row g-4">
+            <!-- Left Sidebar: Resume & filters -->
+            <div class="col-lg-3">
+                <div class="card p-3 mb-3 sticky-top" style="top: 90px; z-index: 1000;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold m-0 text-uppercase text-muted"
+                            style="font-size: 0.8rem; letter-spacing: 0.05em;">Your Profile</h6>
+                        <button class="btn btn-sm btn-link text-decoration-none p-0" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#resumeContent" aria-expanded="true">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                    </div>
+
+                    <div class="collapse show" id="resumeContent">
+                        <div id="resumeSummary" class="small mb-3"></div>
+                        <hr class="text-muted opacity-25">
+                        <div id="jobTypeInsights" class="small"></div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="card p-2 shadow-sm mb-3 compact">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold mb-0">Filter Job Listings</h6>
-            </div>
+            <!-- Main Content: Filters & List -->
+            <div class="col-lg-9">
+                <!-- Search & Filters Toolbar -->
+                <div class="card p-3 mb-4">
+                    <div class="d-flex flex-column gap-3">
+                        <!-- Top Row: Search -->
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i
+                                    class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="globalSearch" class="form-control border-start-0 ps-0"
+                                placeholder="Search by job title, company, or keywords..."
+                                onkeyup="if(event.key === 'Enter') filterJobs()">
+                            <button class="btn btn-primary" onclick="filterJobs()">Search</button>
+                        </div>
 
-            <div class="row g-2 mt-2">
-                <div class="col-md-3">
-                    <select id="filterCompany" class="form-select form-select-sm">
-                        <option value="any">-- Any Company --</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select id="filterTitle" class="form-select form-select-sm">
-                        <option value="any">-- Any Job Title --</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select id="filterLocation" class="form-select form-select-sm">
-                        <option value="any">-- Any Location --</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select id="filterIndustry" class="form-select form-select-sm">
-                        <option value="any">-- Any Industry --</option>
-                    </select>
-                </div>
-            </div>
-            <!-- More filters -->
-            <div class="row g-2 mt-2">
-                <div class="col-md-4">
-                    <select id="filterSeniority" class="form-select form-select-sm">
-                        <option value="any">-- Any Seniority --</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <select id="filterEmployment" class="form-select form-select-sm">
-                        <option value="any">-- Any Employment Type --</option>
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex gap-1">
-                    <input type="date" id="postedFrom" class="form-control form-control-sm" placeholder="From">
-                    <input type="date" id="postedTo" class="form-control form-control-sm" placeholder="To">
-                </div>
-            </div>
-
-            <div class="row g-2 mb-3 mt-3 compact">
-                <div class="col-md-2">
-                    <label for="minSalary" class="form-label small">Min $</label>
-                    <input type="number" id="minSalary" class="form-control form-control-sm" placeholder="0" min="0">
-                </div>
-                <div class="col-md-2">
-                    <label for="maxSalary" class="form-label small">Max $</label>
-                    <input type="number" id="maxSalary" class="form-control form-control-sm" placeholder="999999"
-                        min="0">
-                </div>
-                <div class="col-md-4">
-                    <label for="sortBy" class="form-label small">Sort</label>
-                    <select id="sortBy" class="form-select form-select-sm" aria-label="Sort results">
-                        <option value="relevance">-- Relevance --</option>
-                        <option value="score_desc">Match Score (High to Low)</option>
-                        <option value="score_asc">Match Score (Low to High)</option>
-                        <option value="company">Company (A-Z)</option>
-                        <option value="date_new">Newest Posted</option>
-                        <option value="salary_high">Highest Salary</option>
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <div class="w-100 d-flex gap-2">
-                        <button type="button" class="btn btn-primary btn-sm w-50" onclick="filterJobs()">Apply</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm w-50"
-                            onclick="clearFilters()">Clear</button>
+                        <!-- Filters Grid -->
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <select id="filterCompany" class="form-select form-select-sm" aria-label="Company">
+                                    <option value="any">Company (All)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="filterLocation" class="form-select form-select-sm" aria-label="Location">
+                                    <option value="any">Location (All)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="filterIndustry" class="form-select form-select-sm" aria-label="Industry">
+                                    <option value="any">Industry (All)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="filterSeniority" class="form-select form-select-sm" aria-label="Seniority">
+                                    <option value="any">Seniority (All)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="filterEmployment" class="form-select form-select-sm"
+                                    aria-label="Employment Type">
+                                    <option value="any">Type (All)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="sortBy" class="form-select form-select-sm">
+                                    <option value="relevance">Sort: Body Relevance</option>
+                                    <option value="score_desc">Sort: Match Score (High)</option>
+                                    <option value="date_new">Sort: Newest</option>
+                                    <option value="salary_high">Sort: Salary (High)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex gap-2">
+                                <input type="date" id="postedFrom" class="form-control form-control-sm"
+                                    title="Posted After">
+                                <button class="btn btn-outline-secondary btn-sm flex-grow-1"
+                                    onclick="filterJobs()">Apply Filters</button>
+                                <button class="btn btn-link btn-sm text-decoration-none text-muted"
+                                    onclick="clearFilters()">Reset</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="card p-3 shadow-sm">
-            <h5 class="fw-bold">Matching Jobs</h5>
-            <div id="jobResults" class="mt-3"></div>
-            <canvas id="matchChart" height="100" class="mt-4"></canvas>
+                <!-- Match Chart -->
+                <div class="card p-3 mb-4 d-none">
+                    <h6 class="fw-bold mb-3">Top Matches Overview</h6>
+                    <canvas id="matchChart" height="60"></canvas>
+                </div>
+
+                <!-- Results List -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0">Matched Jobs</h5>
+                    <span class="badge bg-primary rounded-pill" id="resultCountBadge">0 found</span>
+                </div>
+
+                <div id="jobResults" class="d-flex flex-column gap-3"></div>
+            </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="model/data/skill_dict.js"></script>
     <script src="jobs.js"></script>
 </body>

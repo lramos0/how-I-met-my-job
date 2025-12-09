@@ -1,17 +1,142 @@
+/* Global variables for theme */
+:root {
+    --primary: #4F46E5;
+    --primary-hover: #4338ca;
+    --secondary: #6366F1;
+    --accent: #818cf8;
+    --bg-body: #F8FAFC;
+    --bg-card: #ffffff;
+    --text-main: #1E293B;
+    --text-muted: #64748B;
+    --border-color: #E2E8F0;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --radius: 0.75rem;
+}
+
 body {
-    font-family: 'Segoe UI', sans-serif;
-    background: #f8f9fa;
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-body);
+    color: var(--text-main);
+    line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.025em;
 }
 
 .card {
-    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    background: var(--bg-card);
+    transition: box-shadow 0.2s ease;
 }
 
-pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
+.card:hover {
+    box-shadow: var(--shadow-md);
 }
 
-.progress-bar {
-    transition: width 0.6s ease;
+.btn-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(79, 70, 229, 0.4);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.5);
+}
+
+.btn-outline-primary {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+/* Navbar */
+.navbar-custom {
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 0;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--primary) !important;
+}
+
+/* Job Cards */
+.job-card {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+}
+
+.job-title-link {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.job-title-link:hover {
+    color: var(--primary);
+}
+
+.company-name {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.metadata-text {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.metadata-icon {
+    color: var(--primary);
+    margin-right: 0.35rem;
+}
+
+.job-summary {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+/* Match Badge */
+.match-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5em 1em;
+    border-radius: 9999px;
+    box-shadow: var(--shadow-sm);
 }

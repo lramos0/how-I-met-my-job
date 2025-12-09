@@ -98,8 +98,6 @@ async function loadResume() {
     const summaryEl = document.getElementById("resumeSummary");
     if (summaryEl) {
         summaryEl.innerHTML = `
-        <div><b>Name:</b> ${resume.name}</div>
-        <div><b>Email:</b> ${resume.email || 'N/A'}</div>
         <div><b>Title:</b> ${resume.title || 'N/A'}</div>
         <div><b>Location:</b> ${resume.location || 'N/A'}</div>
         <div><b>Education:</b> ${resume.education}</div>
@@ -153,7 +151,7 @@ async function loadResume() {
         if (msgEl) {
             msgEl.innerHTML = `
                 <div class="alert alert-success" role="alert">
-                    Loaded ${window.jobData.length} jobs from live database.
+                    Successfully loaded jobs from live database.
                 </div>`;
         }
     } catch (err) {
@@ -280,6 +278,17 @@ function filterJobs() {
         return companyMatch && titleMatch && locationMatch && industryMatch && seniorityMatch && employmentMatch && postedMatch && preferredRoleMatch && preferredEmploymentMatch;
     });
 
+    // Update Count Badge
+    const countBadge = document.getElementById('resultCountBadge');
+    if (countBadge) countBadge.textContent = `${filtered.length} found`;
+
+    // Toggle Chart Visibility
+    const chartContainer = document.getElementById('matchChart')?.parentElement;
+    if (chartContainer) {
+        if (filtered.length > 0) chartContainer.classList.remove('d-none');
+        else chartContainer.classList.add('d-none');
+    }
+
     computeMatch(filtered);
 }
 
@@ -332,9 +341,23 @@ function computeMatch(jobs) {
         job.matched_skills = matched;
     });
 
-    jobs.sort((a, b) => b.match_score - a.match_score);
+    // Custom Sort Logic
+    const sortBy = document.getElementById('sortBy')?.value || 'relevance';
+    if (sortBy === 'score_desc' || sortBy === 'relevance') {
+        jobs.sort((a, b) => b.match_score - a.match_score);
+    } else if (sortBy === 'score_asc') {
+        jobs.sort((a, b) => a.match_score - b.match_score);
+    } else if (sortBy === 'date_new') {
+        jobs.sort((a, b) => {
+            const da = new Date(a.job_posted_date || 0);
+            const db = new Date(b.job_posted_date || 0);
+            return db - da;
+        });
+    } else if (sortBy === 'salary_high') {
+        jobs.sort((a, b) => (b.job_base_pay_range || '').localeCompare(a.job_base_pay_range || ''));
+    }
 
-    // Filter by last 30days
+    // Filter by last 90days
     const days_old = 90;
     const cutoff_date = new Date(Date.now() - days_old * 24 * 60 * 60 * 1000);
     const recent = jobs.filter(job => {
@@ -343,105 +366,104 @@ function computeMatch(jobs) {
         const d = new Date(raw);
         return !isNaN(d) && d >= cutoff_date;
     });
-    const top = recent.slice(0, 50); // 
+    const top = recent.slice(0, 50);
 
 
     const jobResults = document.getElementById("jobResults");
     if (jobResults) {
-        jobResults.innerHTML = top.map(job => {
-            const title = job.job_title || 'N/A';
-            const company = job.company_name || 'N/A';
-            const location = job.job_location || 'N/A';
-            const jobType = job.job_employment_type || 'N/A';
-            const seniority = job.job_seniority_level || 'N/A';
-            const applyLink = job.job_url || '#';
+        if (top.length === 0) {
+            jobResults.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-3"></i>No jobs found matching your criteria.</div>';
+        } else {
+            jobResults.innerHTML = top.map(job => {
+                const title = job.job_title || 'N/A';
+                const company = job.company_name || 'N/A';
+                const location = job.job_location || 'N/A';
+                const jobType = job.job_employment_type || 'N/A';
+                const seniority = job.job_seniority_level || 'N/A';
+                const applyLink = job.apply_link || job.url;
 
-            // Sanitize and prepare values for safe insertion into HTML
-            const safeTitle = escapeHtml(title);
-            const safeCompany = escapeHtml(company);
-            const safeLocation = escapeHtml(location);
-            const safeJobType = escapeHtml(jobType);
-            const safeSeniority = escapeHtml(seniority);
-            const safeSummary = escapeHtml(job.job_summary || '');
-
-            // Validate apply URL: allow http(s) or relative URLs, otherwise fallback to '#'
-            let safeApply = '#';
-            try {
-                if (typeof applyLink === 'string' && applyLink.trim()) {
-                    const l = applyLink.trim();
-                    if (/^https?:\/\//i.test(l) || /^\//.test(l) || /^\.\//.test(l)) {
-                        safeApply = l;
+                //Scrub incoming strings to prevent accidential HTML character injection
+                let safeApply = '#';
+                try {
+                    if (typeof applyLink === 'string' && applyLink.trim()) {
+                        const l = applyLink.trim();
+                        if (/^https?:\/\//i.test(l) || /^\//.test(l) || /^\.\//.test(l)) {
+                            safeApply = l;
+                        }
                     }
+                } catch (e) {
+                    safeApply = '#';
                 }
-            } catch (e) {
-                safeApply = '#';
-            }
 
-            // Parses posted date
-            let postedRaw = job.job_posted_date;
-            const postedRelative = timeAgo(postedRaw);
+                const safeTitle = escapeHtml(fixEncoding(title));
+                const safeCompany = escapeHtml(fixEncoding(company));
+                const safeLocation = escapeHtml(fixEncoding(location));
+                const safeJobType = escapeHtml(fixEncoding(jobType));
+                const safeSeniority = escapeHtml(fixEncoding(seniority));
 
-            const salary = job.salary || '';
+                let postedRaw = job.job_posted_date;
+                const postedRelative = timeAgo(postedRaw);
+                let salaryDisplay = job.job_base_pay_range || '';
 
-            // Formats salary
-            let salaryDisplay = '';
-            if (typeof salary === 'string' && salary.trim()) salaryDisplay = salary;
-            else if (typeof salary === 'object' && salary !== null) {
-                const min = salary.min || salary.min_salary || salary.salary_min;
-                const max = salary.max || salary.max_salary || salary.salary_max;
-                if (min || max) salaryDisplay = `$${min || '?'} - $${max || '?'} `;
-            }
+                // Summary Fix: truncate logic
+                let summaryText = fixEncoding(job.job_summary || '');
+                const MAX_SUMMARY_LEN = 550;
+                if (summaryText.length > MAX_SUMMARY_LEN) {
+                    summaryText = summaryText.substring(0, MAX_SUMMARY_LEN) + '...';
+                }
+                const safeSummary = escapeHtml(summaryText);
 
-            // Match score color
-            let matchColor = 'bg-secondary';
-            if (job.match_score >= 70) matchColor = 'bg-success';
-            else if (job.match_score >= 40) matchColor = 'bg-warning text-dark';
+                // Determine match badge color
+                let matchColor = 'bg-secondary';
+                if (job.match_score >= 80) matchColor = 'bg-success';
+                else if (job.match_score >= 50) matchColor = 'bg-warning text-dark';
+                else matchColor = 'bg-danger';
 
-            return `
-            <div class="card job-card mb-3 p-3">
-                <div class="row g-0">
-                    <div class="col-md-10">
-                        <h5 class="mb-1">
-                            <a href="${applyLink}" target="_blank" class="job-title-link stretched-link-custom">${title}</a>
-                        </h5>
-                        <div class="mb-2">
-                            <span class="company-name">${company}</span>
-                            <span class="metadata-text mx-1">•</span>
-                            <span class="metadata-text">${location}</span>
+                return `
+                <div class="card job-card mb-3 p-3">
+                    <div class="row align-items-start">
+                        <div class="col-md-9">
+                            <h5 class="mb-1">
+                                <a href="${safeApply}" target="_blank" class="job-title-link stretched-link-custom">${safeTitle}</a>
+                            </h5>
+                            <div class="mb-2">
+                                <span class="company-name text-primary fw-bold">${safeCompany}</span>
+                                <span class="text-muted mx-1">&middot;</span>
+                                <span class="small text-muted"><i class="bi bi-geo-alt me-1"></i>${safeLocation}</span>
+                            </div>
+                            
+                            <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
+                                ${jobType !== 'N/A' ? `<span><i class="bi bi-briefcase me-1"></i>${safeJobType}</span>` : ''}
+                                ${seniority !== 'N/A' ? `<span><i class="bi bi-bar-chart me-1"></i>${safeSeniority}</span>` : ''}
+                                ${salaryDisplay ? `<span class="fw-medium text-dark"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
+                                <span class="text-success"><i class="bi bi-clock me-1"></i>${postedRelative}</span>
+                            </div>
                         </div>
                         
-                        <div class="mb-2 metadata-text">
-                            ${jobType !== 'N/A' ? `<span class="me-3"><i class="bi bi-briefcase-fill me-1"></i>${jobType}</span>` : ''}
-                            ${seniority !== 'N/A' ? `<span class="me-3"><i class="bi bi-bar-chart-fill me-1"></i>${seniority}</span>` : ''}
-                            ${salaryDisplay ? `<span class="me-3"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
-                            <span class="text-success"><i class="bi bi-clock-history me-1"></i>${postedRelative}</span>
+                        <div class="col-md-3 text-end d-flex flex-column gap-2 align-items-end">
+                            <span class="badge ${matchColor} match-badge">
+                                <i class="bi bi-stars me-1"></i>${job.match_score.toFixed(0)}% Match
+                            </span>
+                            <a href="${safeApply}" target="_blank" class="btn btn-outline-primary btn-sm w-100 mt-2">Apply Now</a>
                         </div>
-
-                        ${job.job_summary ? `<div class="job-summary text-muted mt-2">${job.job_summary}</div>` : ''}
-                        
-                        ${job.job_description ? `
-                        <details class="mt-3">
-                            <summary class="text-primary" style="cursor:pointer;"><i class="bi bi-info-circle me-1"></i>Job Description</summary>
-                            <div class="job-description text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(job.job_description)}</div>
-                        </details>` : ''}
                     </div>
                     
-                    <div class="col-md-2 d-flex flex-column align-items-end justify-content-between">
-                        <span class="badge ${matchColor} match-badge p-2 rounded-pill">
-                            ${job.match_score.toFixed(0)}% Match
-                        </span>
-                        <div class="mt-3">
-                             <button type="button" data-link="${safeApply}" class="btn btn-apply btn-sm text-decoration-none">Apply</button>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                             ${safeSummary ? `<div class="job-summary mb-2">${safeSummary}</div>` : ''}
+                            
+                            ${job.job_description ? `
+                            <details class="mt-2 text-primary small">
+                                <summary style="cursor:pointer;">Full Description</summary>
+                                <div class="text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(fixEncoding(job.job_description))}</div>
+                            </details>` : ''}
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
-        }).join("");
+            `;
+            }).join("");
+        }
     }
-
-    // Initializes apply modal
-    initApplyModal();
 
     drawChart(top);
 }
@@ -631,38 +653,26 @@ function populateJobTypeInsights(insights) {
     });
 }
 
+// Helper to fix mojibake (encoding errors from scraping data)
+function fixEncoding(str) {
+    if (!str) return '';
+    return str
+        .replace(/â€™/g, "'")
+        .replace(/â€“/g, "–")
+        .replace(/â€”/g, "—")
+        .replace(/â€œ/g, '"')
+        .replace(/â€\x9d/g, '"')
+        .replace(/â€˜/g, "'")
+        .replace(/â€¢/g, "•")
+        .replace(/Â/g, "") // non-breaking space artifact
+        .replace(/â€¦/g, "…");
+}
+
 // Escapes HTML
 function escapeHtml(str) {
     return String(str).replace(/[&"'<>]/g, function (s) {
         return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
     });
-}
-
-// Apply button handling - direct redirect without modal
-function initApplyModal() {
-    const jobResults = document.getElementById('jobResults');
-    if (jobResults) {
-        jobResults.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-apply');
-            if (!btn) return;
-
-            const link = btn.getAttribute('data-link');
-
-            // Validate link before opening
-            if (link && link !== '#') {
-                try {
-                    window.open(link, '_blank', 'noopener');
-                } catch (e) {
-                    // Fallback: create and click anchor tag
-                    const a = document.createElement('a');
-                    a.href = link;
-                    a.target = '_blank';
-                    a.rel = 'noopener';
-                    a.click();
-                }
-            }
-        });
-    }
 }
 
 function drawChart(topJobs) {
