@@ -274,10 +274,107 @@ function extractTitle(text) {
     return "Unknown";
 }
 
-function estimateYears(text) {
-    const matches = [...text.matchAll(/(\d+)\s+years?/gi)];
-    return matches.length ? Math.max(...matches.map(m => parseInt(m[1]))) : 0;
+
+const monthIndex = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11
+};
+
+function parseDateToken(token, isEnd) {
+  token = token.trim();
+
+  // Present / Current / Now
+  if (/^(present|current|now)$/i.test(token)) return new Date();
+
+  // Month Year
+  let m = token.match(
+    /(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[ ,.-]*(\d{4})/i
+  );
+  if (m) {
+    const month = monthIndex[m[1].toLowerCase()];
+    const year = parseInt(m[2], 10);
+    return new Date(year, month, 1);
+  }
+
+  // MM/YYYY
+  m = token.match(/(\d{1,2})[/-](\d{4})/);
+  if (m) {
+    const month = Math.min(Math.max(parseInt(m[1], 10) - 1, 0), 11);
+    const year = parseInt(m[2], 10);
+    return new Date(year, month, 1);
+  }
+
+  // Bare year "2018"
+  m = token.match(/(\d{4})/);
+  if (m) {
+    const year = parseInt(m[1], 10);
+    return new Date(year, isEnd ? 11 : 0, 1);
+  }
+
+  return null;
 }
+
+function estimateYears(text) {
+  const explicitMatches = [...text.matchAll(/(\d+(?:\.\d+)?)\s+years?/gi)];
+  const explicitYears = explicitMatches.length
+    ? Math.max(...explicitMatches.map(m => parseFloat(m[1])))
+    : 0;
+
+  const RANGE_REGEX =
+    /((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[ ,.-]*\d{4}|\d{1,2}[/-]\d{4}|\d{4})\s*(?:-|–|to)\s*(Present|Current|Now|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[ ,.-]*\d{4}|\d{1,2}[/-]\d{4}|\d{4})/gi;
+
+  const ranges = [];
+
+  for (const match of text.matchAll(RANGE_REGEX)) {
+    const start = parseDateToken(match[1], false);
+    const end = parseDateToken(match[2], true);
+    if (start && end && end >= start) {
+      ranges.push({ start, end });
+    }
+  }
+
+  if (!ranges.length) return Math.floor(explicitYears);
+
+  // Merge overlapping ranges
+  ranges.sort((a, b) => a.start - b.start);
+  const merged = [];
+  let cur = ranges[0];
+
+  for (let i = 1; i < ranges.length; i++) {
+    const next = ranges[i];
+    if (next.start <= cur.end) {
+      if (next.end > cur.end) cur.end = next.end;
+    } else {
+      merged.push(cur);
+      cur = next;
+    }
+  }
+  merged.push(cur);
+
+  // Compute months
+  let totalMonths = 0;
+  for (const r of merged) {
+    const months =
+      (r.end.getFullYear() - r.start.getFullYear()) * 12 +
+      (r.end.getMonth() - r.start.getMonth()) +
+      1;
+    totalMonths += Math.max(months, 0);
+  }
+
+  const yearsFromDates = totalMonths / 12;
+  return Math.floor(Math.max(yearsFromDates, explicitYears));
+}
+
 
 function extractIndustries(text) {
     const industries = [];
