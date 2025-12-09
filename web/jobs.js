@@ -376,6 +376,96 @@ function computeMatch(jobs) {
 
 
     const jobResults = document.getElementById("jobResults");
+    if (jobResults) {
+        if (top.length === 0) {
+            jobResults.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-3"></i>No jobs found matching your criteria.</div>';
+        } else {
+            jobResults.innerHTML = top.map(job => {
+                const title = job.job_title || 'N/A';
+                const company = job.company_name || 'N/A';
+                const location = job.job_location || 'N/A';
+                const jobType = job.job_employment_type || 'N/A';
+                const seniority = job.job_seniority_level || 'N/A';
+                const applyLink = job.apply_link || job.url;
+
+                //Scrub incoming strings to prevent accidential HTML character injection
+                let safeApply = '#';
+                try {
+                    if (typeof applyLink === 'string' && applyLink.trim()) {
+                        const l = applyLink.trim();
+                        if (/^https?:\/\//i.test(l) || /^\//.test(l) || /^\.\//.test(l)) {
+                            safeApply = l;
+                        }
+                    }
+                } catch (e) {
+                    safeApply = '#';
+                }
+
+                const safeTitle = escapeHtml(fixEncoding(title));
+                const safeCompany = escapeHtml(fixEncoding(company));
+                const safeLocation = escapeHtml(fixEncoding(location));
+                const safeJobType = escapeHtml(fixEncoding(jobType));
+                const safeSeniority = escapeHtml(fixEncoding(seniority));
+
+                let postedRaw = job.job_posted_date;
+                const postedRelative = timeAgo(postedRaw);
+                let salaryDisplay = job.job_base_pay_range || '';
+
+                // Summary Fix: truncate logic
+                let summaryText = fixEncoding(job.job_summary || '');
+                const MAX_SUMMARY_LEN = 250;
+                if (summaryText.length > MAX_SUMMARY_LEN) {
+                    summaryText = summaryText.substring(0, MAX_SUMMARY_LEN) + '...';
+                }
+                const safeSummary = escapeHtml(summaryText);
+
+                // Determine match badge color
+                let matchColor = 'bg-secondary';
+                if (job.match_score >= 80) matchColor = 'bg-success';
+                else if (job.match_score >= 50) matchColor = 'bg-warning text-dark';
+                else matchColor = 'bg-danger';
+
+                return `
+                <div class="card job-card mb-3 p-3">
+                    <div class="row align-items-start">
+                        <div class="col-md-9">
+                            <h5 class="mb-1">
+                                <a href="${safeApply}" target="_blank" class="job-title-link stretched-link-custom">${safeTitle}</a>
+                            </h5>
+                            <div class="mb-2">
+                                <span class="company-name text-primary fw-bold">${safeCompany}</span>
+                                <span class="text-muted mx-1">&middot;</span>
+                                <span class="small text-muted"><i class="bi bi-geo-alt me-1"></i>${safeLocation}</span>
+                            </div>
+                            
+                            <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
+                                ${jobType !== 'N/A' ? `<span><i class="bi bi-briefcase me-1"></i>${safeJobType}</span>` : ''}
+                                ${seniority !== 'N/A' ? `<span><i class="bi bi-bar-chart me-1"></i>${safeSeniority}</span>` : ''}
+                                ${salaryDisplay ? `<span class="fw-medium text-dark"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
+                                <span class="text-success"><i class="bi bi-clock me-1"></i>${postedRelative}</span>
+                            </div>
+
+                            ${safeSummary ? `<div class="job-summary mb-2">${safeSummary}</div>` : ''}
+                            
+                            ${job.job_description ? `
+                            <details class="mt-2 text-primary small">
+                                <summary style="cursor:pointer;">Full Description</summary>
+                                <div class="text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(fixEncoding(job.job_description))}</div>
+                            </details>` : ''}
+                        </div>
+                        
+                        <div class="col-md-3 text-end d-flex flex-column gap-2 align-items-end">
+                            <span class="badge ${matchColor} match-badge">
+                                <i class="bi bi-stars me-1"></i>${job.match_score.toFixed(0)}% Match
+                            </span>
+                            <button type="button" data-link="${safeApply}" class="btn btn-outline-primary btn-sm btn-apply w-100 mt-2">Apply Now</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join("");
+        }
+    }
     initApplyModal();
 
     drawChart(top);
