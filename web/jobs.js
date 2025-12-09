@@ -674,62 +674,6 @@ function escapeHtml(str) {
     });
 }
 
-// Apply modal handling
-function showApplyModal(link, title, company) {
-    const modal = document.getElementById('applyModal');
-    if (!modal) return;
-    const body = document.getElementById('applyModalBody');
-    const heading = document.getElementById('applyModalTitle');
-    heading.textContent = `Open application for: ${title} @${company} `;
-    body.textContent = 'This will open the application page in a new tab. Continue?';
-    modal.dataset.link = link;
-    modal.style.display = 'flex';
-}
-
-function hideApplyModal() {
-    const modal = document.getElementById('applyModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    delete modal.dataset.link;
-}
-
-function initApplyModal() {
-    const jobResults = document.getElementById('jobResults');
-    if (jobResults) {
-        jobResults.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-apply');
-            if (!btn) return;
-            const card = btn.closest('.job-card');
-            const link = btn.getAttribute('data-link') || btn.getAttribute('href') || '#';
-            const title = card?.querySelector('.job-title-link')?.textContent?.trim() || 'Job';
-            const company = card?.querySelector('.company-name')?.textContent?.trim() || '';
-            showApplyModal(link, title, company);
-        });
-    }
-
-    const cancel = document.getElementById('applyCancelBtn');
-    const confirm = document.getElementById('applyConfirmBtn');
-    const modal = document.getElementById('applyModal');
-    if (cancel) cancel.addEventListener('click', hideApplyModal);
-    if (confirm) confirm.addEventListener('click', () => {
-        if (!modal) return;
-        const link = modal.dataset.link;
-        if (link) {
-            try {
-                window.open(link, '_blank', 'noopener');
-            } catch (e) {
-                // Fallback
-                const a = document.createElement('a');
-                a.href = link;
-                a.target = '_blank';
-                a.rel = 'noopener';
-                a.click();
-            }
-        }
-        hideApplyModal();
-    });
-}
-
 function drawChart(topJobs) {
     const ctx = document.getElementById("matchChart").getContext("2d");
     if (window.jobChart) window.jobChart.destroy();
