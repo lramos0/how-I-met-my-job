@@ -15,13 +15,9 @@
 # COMMAND ----------
 
 import os
-import json
 import mlflow
 import pandas as pd
 from supabase import create_client, Client
-from pyspark.sql import SparkSession
-
-spark = SparkSession.builder.getOrCreate()
 
 # --- Configuration ---
 # BEST PRACTICE: Use Databricks Secrets for these values in production
