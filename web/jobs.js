@@ -341,8 +341,6 @@ function computeMatch(jobs) {
         job.matched_skills = matched;
     });
 
-
-
     // Custom Sort Logic
     const sortBy = document.getElementById('sortBy')?.value || 'relevance';
     if (sortBy === 'score_desc' || sortBy === 'relevance') {
@@ -440,8 +438,19 @@ function computeMatch(jobs) {
                                 ${salaryDisplay ? `<span class="fw-medium text-dark"><i class="bi bi-cash me-1"></i>${salaryDisplay}</span>` : ''}
                                 <span class="text-success"><i class="bi bi-clock me-1"></i>${postedRelative}</span>
                             </div>
-
-                            ${safeSummary ? `<div class="job-summary mb-2">${safeSummary}</div>` : ''}
+                        </div>
+                        
+                        <div class="col-md-3 text-end d-flex flex-column gap-2 align-items-end">
+                            <span class="badge ${matchColor} match-badge">
+                                <i class="bi bi-stars me-1"></i>${job.match_score.toFixed(0)}% Match
+                            </span>
+                            <a href="${safeApply}" target="_blank" class="btn btn-outline-primary btn-sm w-100 mt-2">Apply Now</a>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                             ${safeSummary ? `<div class="job-summary mb-2">${safeSummary}</div>` : ''}
                             
                             ${job.job_description ? `
                             <details class="mt-2 text-primary small">
@@ -449,20 +458,12 @@ function computeMatch(jobs) {
                                 <div class="text-muted mt-2 small" style="white-space: pre-wrap;">${escapeHtml(fixEncoding(job.job_description))}</div>
                             </details>` : ''}
                         </div>
-                        
-                        <div class="col-md-3 text-end d-flex flex-column gap-2 align-items-end">
-                            <span class="badge ${matchColor} match-badge">
-                                <i class="bi bi-stars me-1"></i>${job.match_score.toFixed(0)}% Match
-                            </span>
-                            <button type="button" data-link="${safeApply}" class="btn btn-outline-primary btn-sm btn-apply w-100 mt-2">Apply Now</button>
-                        </div>
                     </div>
                 </div>
             `;
             }).join("");
         }
     }
-    initApplyModal();
 
     drawChart(top);
 }
@@ -671,62 +672,6 @@ function fixEncoding(str) {
 function escapeHtml(str) {
     return String(str).replace(/[&"'<>]/g, function (s) {
         return ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[s]);
-    });
-}
-
-// Apply modal handling
-function showApplyModal(link, title, company) {
-    const modal = document.getElementById('applyModal');
-    if (!modal) return;
-    const body = document.getElementById('applyModalBody');
-    const heading = document.getElementById('applyModalTitle');
-    heading.textContent = `Open application for: ${title} @${company} `;
-    body.textContent = 'This will open the application page in a new tab. Continue?';
-    modal.dataset.link = link;
-    modal.style.display = 'flex';
-}
-
-function hideApplyModal() {
-    const modal = document.getElementById('applyModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    delete modal.dataset.link;
-}
-
-function initApplyModal() {
-    const jobResults = document.getElementById('jobResults');
-    if (jobResults) {
-        jobResults.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-apply');
-            if (!btn) return;
-            const card = btn.closest('.job-card');
-            const link = btn.getAttribute('data-link') || btn.getAttribute('href') || '#';
-            const title = card?.querySelector('.job-title-link')?.textContent?.trim() || 'Job';
-            const company = card?.querySelector('.company-name')?.textContent?.trim() || '';
-            showApplyModal(link, title, company);
-        });
-    }
-
-    const cancel = document.getElementById('applyCancelBtn');
-    const confirm = document.getElementById('applyConfirmBtn');
-    const modal = document.getElementById('applyModal');
-    if (cancel) cancel.addEventListener('click', hideApplyModal);
-    if (confirm) confirm.addEventListener('click', () => {
-        if (!modal) return;
-        const link = modal.dataset.link;
-        if (link) {
-            try {
-                window.open(link, '_blank', 'noopener');
-            } catch (e) {
-                // Fallback
-                const a = document.createElement('a');
-                a.href = link;
-                a.target = '_blank';
-                a.rel = 'noopener';
-                a.click();
-            }
-        }
-        hideApplyModal();
     });
 }
 
