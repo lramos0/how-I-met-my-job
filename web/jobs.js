@@ -93,6 +93,21 @@ async function loadResume() {
     }
 
     window.resumeData = resume;
+    // Build industries query string from resume.industries
+    const industriesArray = Array.isArray(resume.industries)
+    ? resume.industries
+    : (resume.industries ? [resume.industries] : []);
+
+    let jobsUrl = '/.netlify/functions/get-jobs';
+
+    if (industriesArray.length > 0) {
+        // Encode each industry separately, then join with commas
+        const encodedIndustries = industriesArray
+        .map(s => encodeURIComponent(String(s)))
+        .join(',');
+
+        jobsUrl += `?industries=${encodedIndustries}`;
+    }
 
     // Shows resume summary
     const summaryEl = document.getElementById("resumeSummary");
@@ -120,7 +135,7 @@ async function loadResume() {
     // Fetches jobs from Netlify function
     const msgEl = document.getElementById('dataMessage');
     try {
-        const response = await fetch("/.netlify/functions/get-jobs");
+        const response = await fetch(jobsUrl);
         if (!response.ok) throw new Error(`Failed to load jobs (HTTP ${response.status})`);
         const jobsData = await response.json();
 
