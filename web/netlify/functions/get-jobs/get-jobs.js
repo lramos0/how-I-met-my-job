@@ -11,7 +11,6 @@ exports.handler = async (event, context) => {
     // --- Parse industries from query string or body ---
     let industries = [];
 
-    // GET: /get-jobs?industries=data%20science,analytics
     if (event.queryStringParameters && event.queryStringParameters.industries) {
       industries = event.queryStringParameters.industries
         .split(',')
@@ -19,7 +18,6 @@ exports.handler = async (event, context) => {
         .filter(Boolean);
     }
 
-    // (Optional) also support POST with JSON body:
     if (!industries.length && event.httpMethod === 'POST' && event.body) {
       try {
         const body = JSON.parse(event.body);
@@ -37,21 +35,16 @@ exports.handler = async (event, context) => {
     let query = supabase
       .from('job_listings')
       .select('*')
-      .order('job_posted_date', { ascending: false }) // optional but nice
-      .limit(250);
+      .order('job_posted_date', { ascending: false }) // newest first
+      .limit(1000);
 
-    // If we have industries, filter by them
     if (industries.length > 0) {
-      // Example industries: ["Data", "Analytics"]
-      // Build OR conditions like:
-      //   job_industries.ilike.%Data%,job_industries.ilike.%Analytics%
       const orClauses = industries.map(industry => {
-        // Escape % and _ which are special in LIKE
         const safe = industry.replace(/[%_]/g, m => '\\' + m);
         return `job_industries.ilike.%${safe}%`;
       });
 
-      query = query.or(orClauses.join(',')); // OR across industries
+      query = query.or(orClauses.join(','));
     }
 
     const { data, error } = await query;
@@ -64,12 +57,26 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // --- Enforce uniqueness on job_title ---
+    const seenTitles = new Set();
+    const uniqueJobs = [];
+
+    for (const row of data || []) {
+      // normalize title to avoid "Data Scientist" vs "data scientist" double-counts
+      const titleKey = (row.job_title || '').trim().toLowerCase();
+      if (!titleKey) continue;
+
+      if (seenTitles.has(titleKey)) continue;
+      seenTitles.add(titleKey);
+      uniqueJobs.push(row);
+    }
+
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data || []),
+      body: JSON.stringify(uniqueJobs),
     };
   } catch (error) {
     console.error('Error fetching jobs:', error);
@@ -79,4 +86,5 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
 
