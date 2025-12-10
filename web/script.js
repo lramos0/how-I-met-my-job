@@ -1,4 +1,57 @@
 /* --------------------------------------------------------
+   DYNAMIC STATUS (BACKEND WAITING)
+--------------------------------------------------------- */
+const backendStatusMessages = [
+    "📡 Sending to backend…",
+    "📖 Reading your resume…",
+    "🏷️ Determining your industry…",
+    "🛠️ Parsing your skills…",
+    "📊 Crunching some numbers…",
+    "☁️ Warming up compute clusters…",
+    "🤝 Matching you with roles…"
+];
+
+let backendStatusTimer = null;
+
+/**
+ * Starts cycling through status messages every 2.5 seconds.
+ * @param {HTMLElement} statusEl - The HTML element showing the status text.
+ */
+function startBackendStatusAnimation(statusEl) {
+    if (!statusEl) return;
+
+    let i = 0;
+    statusEl.textContent = backendStatusMessages[i];
+
+    // Clear any previous timer
+    if (backendStatusTimer) {
+        clearInterval(backendStatusTimer);
+    }
+
+    backendStatusTimer = setInterval(() => {
+        i = (i + 1) % backendStatusMessages.length;
+        statusEl.textContent = backendStatusMessages[i];
+    }, 2500); // Change delay as desired
+}
+
+/**
+ * Stops the rotating status messages and optionally sets a final text.
+ * @param {HTMLElement} statusEl - The status element.
+ * @param {string} finalText - (Optional) final message to display.
+ */
+function stopBackendStatusAnimation(statusEl, finalText) {
+    if (backendStatusTimer) {
+        clearInterval(backendStatusTimer);
+        backendStatusTimer = null;
+    }
+
+    if (statusEl && finalText) {
+        statusEl.textContent = finalText;
+    }
+}
+
+
+/* --------------------------------------------------------
    PDF TEXT EXTRACTION
 --------------------------------------------------------- */
 async function extractPdfText(file) {
@@ -168,10 +221,13 @@ async function parseResume() {
         password: "craig123"
     };
 
-    status.textContent = "📡 Sending to backend…";
+    startBackendStatusAnimation(status);
 
     const response = await sendJSON(resumeJSON);
     console.log("Backend response:", response);
+
+    stopBackendStatusAnimation(status);
+
 
     if (response && Array.isArray(response.predictions) && response.predictions.length > 0) {
         const prediction = response.predictions[0];
