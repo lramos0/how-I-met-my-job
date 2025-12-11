@@ -140,3 +140,8 @@ h6 {
     border-radius: 9999px;
     box-shadow: var(--shadow-sm);
 }
+
+footer {
+  font-size: 14px;
+  line-height: 1.5;
+}
