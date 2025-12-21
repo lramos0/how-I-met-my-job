@@ -182,19 +182,14 @@ exports.handler = async (event) => {
 
     // You asked for /listings?limit=10 — so cap again AFTER filtering/dedupe
     const finalItems = unique.slice(0, limit);
-
     return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        // useful for debugging/observability
-        "Cache-Control": "no-store",
-      },
-      body: JSON.stringify({
-        upstream: url.toString(),
-        count: finalItems.length,
-        items: finalItems,
-      }),
+        statusCode: 200,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "X-Jobs-Count": String(finalItems.length),
+        },
+        body: JSON.stringify(finalItems),
     };
   } catch (error) {
     console.error("Error fetching jobs:", error);
