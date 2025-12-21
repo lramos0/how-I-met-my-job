@@ -198,8 +198,12 @@ function populateFilters() {
         if (job.job_title) titles.add(job.job_title.trim());
         if (job.job_location) locations.add(job.job_location.trim());
         if (job.job_industries) {
-            job.job_industries.split(/[;,|\/]+/).forEach(i => {
-                const v = i.trim();
+            const inds = Array.isArray(job.job_industries)
+                ? job.job_industries
+                : String(job.job_industries).split(/[;,|\/]+/);
+
+            inds.forEach(i => {
+                const v = String(i || "").trim();
                 if (v) industries.add(v);
             });
         }
