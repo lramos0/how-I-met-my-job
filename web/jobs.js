@@ -232,83 +232,90 @@ function populateFilters() {
     fill('filterEmployment', employmentTypes);
 }
 
+function asLowerString(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(x => String(x ?? "").trim()).join(", ").toLowerCase();
+  if (typeof v === "string") return v.toLowerCase();
+  return String(v).toLowerCase();
+}
+
+// For filter dropdown values: treat null/undefined as 'any'
+function normFilterValue(v) {
+  if (v == null) return "any";
+  return String(v).trim().toLowerCase() || "any";
+}
+
 function filterJobs() {
-    const company = document.getElementById("filterCompany") ? document.getElementById("filterCompany").value : 'any';
-    const title = document.getElementById("filterTitle") ? document.getElementById("filterTitle").value : 'any';
-    const location = document.getElementById("filterLocation") ? document.getElementById("filterLocation").value : 'any';
-    const industry = document.getElementById("filterIndustry") ? document.getElementById("filterIndustry").value : 'any';
-    const seniority = document.getElementById("filterSeniority") ? document.getElementById("filterSeniority").value : 'any';
-    const employment = document.getElementById("filterEmployment") ? document.getElementById("filterEmployment").value : 'any';
-    const postedFrom = document.getElementById("postedFrom") ? document.getElementById("postedFrom").value : '';
-    const postedTo = document.getElementById("postedTo") ? document.getElementById("postedTo").value : '';
+  const company   = document.getElementById("filterCompany") ? normFilterValue(document.getElementById("filterCompany").value) : "any";
+  const title     = document.getElementById("filterTitle") ? normFilterValue(document.getElementById("filterTitle").value) : "any";
+  const location  = document.getElementById("filterLocation") ? normFilterValue(document.getElementById("filterLocation").value) : "any";
+  const industry  = document.getElementById("filterIndustry") ? normFilterValue(document.getElementById("filterIndustry").value) : "any";
+  const seniority = document.getElementById("filterSeniority") ? normFilterValue(document.getElementById("filterSeniority").value) : "any";
+  const employment= document.getElementById("filterEmployment") ? normFilterValue(document.getElementById("filterEmployment").value) : "any";
 
-    // Preferred filters (optional)
-    const preferredRoles = (window.preferredJobRoles || []).map(s => s.toLowerCase());
-    const preferredEmployment = (window.preferredEmploymentTypes || []).map(s => s.toLowerCase());
+  const postedFrom = document.getElementById("postedFrom") ? document.getElementById("postedFrom").value : "";
+  const postedTo   = document.getElementById("postedTo") ? document.getElementById("postedTo").value : "";
 
-    let filtered = window.jobData.filter(job => {
-        const jCompany = (job.company_name || "").toLowerCase();
-        const jTitle = (job.job_title || "").toLowerCase();
-        const jLocation = (job.job_location || "").toLowerCase();
-        const jIndustries = (job.job_industries || "").toLowerCase();
-        const jSeniority = (job.job_seniority_level || "").toLowerCase();
-        const jEmployment = (job.job_employment_type || "").toLowerCase();
-        const jPosted = job.job_posted_date || job.posted_date || job.posted || "";
+  // Preferred filters (optional) — make them safe too
+  const preferredRoles = (window.preferredJobRoles || []).map(s => asLowerString(s));
+  const preferredEmployment = (window.preferredEmploymentTypes || []).map(s => asLowerString(s));
 
-        // Normalizes posted date
-        let jPostedDate = null;
-        if (jPosted) {
-            const d = new Date(jPosted);
-            if (!isNaN(d)) {
-                // Uses ISO date
-                jPostedDate = d.toISOString().slice(0, 10);
-            }
-        }
+  let filtered = (window.jobData || []).filter(job => {
+    const jCompany    = asLowerString(job.company_name);
+    const jTitle      = asLowerString(job.job_title);
+    const jLocation   = asLowerString(job.job_location);
+    const jIndustries = asLowerString(job.job_industries);          // ✅ handles array OR string
+    const jSeniority  = asLowerString(job.job_seniority_level);
+    const jEmployment = asLowerString(job.job_employment_type);
 
-        const companyMatch = (!company || company === 'any') ? true : jCompany.includes(company);
-        const titleMatch = (!title || title === 'any') ? true : jTitle.includes(title);
-        const locationMatch = (!location || location === 'any') ? true : jLocation.includes(location);
-        const industryMatch = (!industry || industry === 'any') ? true : jIndustries.includes(industry);
-        const seniorityMatch = (!seniority || seniority === 'any') ? true : jSeniority.includes(seniority);
-        const employmentMatch = (!employment || employment === 'any') ? true : jEmployment.includes(employment);
+    const jPosted = job.job_posted_date || job.posted_date || job.posted || "";
 
-        // Checks preferred roles
-        let preferredRoleMatch = true;
-        if (preferredRoles.length) {
-            preferredRoleMatch = preferredRoles.some(r => jTitle.includes(r) || jIndustries.includes(r));
-        }
-
-        // Checks preferred employment types
-        let preferredEmploymentMatch = true;
-        if (preferredEmployment.length) {
-            preferredEmploymentMatch = preferredEmployment.some(e => jEmployment.includes(e));
-        }
-
-        let postedMatch = true;
-        if (postedFrom) {
-            if (jPostedDate) postedMatch = postedMatch && (jPostedDate >= postedFrom);
-            else postedMatch = false;
-        }
-        if (postedTo) {
-            if (jPostedDate) postedMatch = postedMatch && (jPostedDate <= postedTo);
-            else postedMatch = false;
-        }
-
-        return companyMatch && titleMatch && locationMatch && industryMatch && seniorityMatch && employmentMatch && postedMatch && preferredRoleMatch && preferredEmploymentMatch;
-    });
-
-    // Update Count Badge
-    const countBadge = document.getElementById('resultCountBadge');
-    if (countBadge) countBadge.textContent = `${filtered.length} found`;
-
-    // Toggle Chart Visibility
-    const chartContainer = document.getElementById('matchChart')?.parentElement;
-    if (chartContainer) {
-        if (filtered.length > 0) chartContainer.classList.remove('d-none');
-        else chartContainer.classList.add('d-none');
+    // Normalize posted date -> YYYY-MM-DD
+    let jPostedDate = null;
+    if (jPosted) {
+      const d = new Date(jPosted);
+      if (!isNaN(d)) jPostedDate = d.toISOString().slice(0, 10);
     }
 
-    computeMatch(filtered);
+    const companyMatch    = (company === "any") ? true : jCompany.includes(company);
+    const titleMatch      = (title === "any") ? true : jTitle.includes(title);
+    const locationMatch   = (location === "any") ? true : jLocation.includes(location);
+    const industryMatch   = (industry === "any") ? true : jIndustries.includes(industry);
+    const seniorityMatch  = (seniority === "any") ? true : jSeniority.includes(seniority);
+    const employmentMatch = (employment === "any") ? true : jEmployment.includes(employment);
+
+    // Preferred roles
+    let preferredRoleMatch = true;
+    if (preferredRoles.length) {
+      preferredRoleMatch = preferredRoles.some(r => r && (jTitle.includes(r) || jIndustries.includes(r)));
+    }
+
+    // Preferred employment
+    let preferredEmploymentMatch = true;
+    if (preferredEmployment.length) {
+      preferredEmploymentMatch = preferredEmployment.some(e => e && jEmployment.includes(e));
+    }
+
+    // Posted date range
+    let postedMatch = true;
+    if (postedFrom) postedMatch = postedMatch && (jPostedDate ? (jPostedDate >= postedFrom) : false);
+    if (postedTo)   postedMatch = postedMatch && (jPostedDate ? (jPostedDate <= postedTo) : false);
+
+    return companyMatch && titleMatch && locationMatch && industryMatch &&
+           seniorityMatch && employmentMatch && postedMatch &&
+           preferredRoleMatch && preferredEmploymentMatch;
+  });
+
+  const countBadge = document.getElementById('resultCountBadge');
+  if (countBadge) countBadge.textContent = `${filtered.length} found`;
+
+  const chartContainer = document.getElementById('matchChart')?.parentElement;
+  if (chartContainer) {
+    if (filtered.length > 0) chartContainer.classList.remove('d-none');
+    else chartContainer.classList.add('d-none');
+  }
+
+  computeMatch(filtered);
 }
 
 function timeAgo(dateString) {
