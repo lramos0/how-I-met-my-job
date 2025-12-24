@@ -1,0 +1,12 @@
+CLUSTER SUMMARY
+================================================================================
+
+Optimal number of clusters: 3
+Silhouette Score: 0.1779
+Total candidates: 19
+
+         count  avg_years_exp  std_years_exp
+cluster                                     
+0           15           6.67           4.72
+1            3           6.67           1.53
+2            1           5.00            NaN
