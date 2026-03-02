@@ -1,21 +1,21 @@
 // netlify/functions/get-jobs.js
 //
-// Proxies to your listings API:
-//   GET  /.netlify/functions/get-jobs?limit=10&industries=Software,Government&country_code=US
-//   POST /.netlify/functions/get-jobs   { "limit": 10, "industries": ["Software"], "country_code": "US" }
-//
-// It calls:
-//   https://data.mewannajob.com/listings?limit=10&country_code=US
-//
-// Then (optionally) filters by industries client-side and de-dupes by job_title.
+// Queries Databricks UC table via Statement Execution API.
+// GET  /.netlify/functions/get-jobs?limit=10&industries=Software,Government&country_code=US
+// POST /.netlify/functions/get-jobs { "limit": 10, "industries": ["Software"], "country_code": "US" }
 
-const LISTINGS_BASE_URL =
-  process.env.LISTINGS_BASE_URL || "https://data.mewannajob.com";
+function parseJsonBody(event) {
+  if (event.httpMethod !== "POST" || !event.body) return null;
+  try {
+    return JSON.parse(event.body);
+  } catch {
+    return null;
+  }
+}
 
 function parseIndustriesFromEvent(event) {
   let industries = [];
 
-  // Query string: ?industries=a,b,c
   if (event.queryStringParameters?.industries) {
     industries = event.queryStringParameters.industries
       .split(",")
@@ -23,15 +23,10 @@ function parseIndustriesFromEvent(event) {
       .filter(Boolean);
   }
 
-  // POST body: { industries: [...] }
-  if (!industries.length && event.httpMethod === "POST" && event.body) {
-    try {
-      const body = JSON.parse(event.body);
-      if (Array.isArray(body.industries)) {
-        industries = body.industries.map((s) => String(s).trim()).filter(Boolean);
-      }
-    } catch (e) {
-      console.warn("Failed to parse JSON body:", e);
+  if (!industries.length) {
+    const body = parseJsonBody(event);
+    if (body && Array.isArray(body.industries)) {
+      industries = body.industries.map((s) => String(s).trim()).filter(Boolean);
     }
   }
 
@@ -39,37 +34,30 @@ function parseIndustriesFromEvent(event) {
 }
 
 function parseLimitFromEvent(event) {
-  // support ?limit=10 or POST { limit: 10 }
   let limit = 10;
 
   const qsLimit = event.queryStringParameters?.limit;
   if (qsLimit != null) {
     const n = Number(qsLimit);
     if (Number.isFinite(n)) limit = n;
-  } else if (event.httpMethod === "POST" && event.body) {
-    try {
-      const body = JSON.parse(event.body);
-      if (body.limit != null) {
-        const n = Number(body.limit);
-        if (Number.isFinite(n)) limit = n;
-      }
-    } catch (_) {}
+  } else {
+    const body = parseJsonBody(event);
+    if (body?.limit != null) {
+      const n = Number(body.limit);
+      if (Number.isFinite(n)) limit = n;
+    }
   }
 
-  // keep it sane
   limit = Math.max(1, Math.min(100, Math.floor(limit)));
   return limit;
 }
 
 function parseCountryCodeFromEvent(event) {
-  // support ?country_code=US or POST { country_code: "US" }
   let cc = event.queryStringParameters?.country_code;
 
-  if (!cc && event.httpMethod === "POST" && event.body) {
-    try {
-      const body = JSON.parse(event.body);
-      cc = body.country_code;
-    } catch (_) {}
+  if (!cc) {
+    const body = parseJsonBody(event);
+    cc = body?.country_code;
   }
 
   if (!cc) return null;
@@ -79,15 +67,22 @@ function parseCountryCodeFromEvent(event) {
 }
 
 function normalizeIndustries(val) {
-  // job_industries might be an array OR a string depending on your DB schema
   if (Array.isArray(val)) {
     return val.map((s) => String(s).trim().toLowerCase()).filter(Boolean);
   }
   if (typeof val === "string") {
-    // fallback: split on commas if someone stored "Engineering, Government"
-    return val
+    // Could be JSON string '["Software"]' or CSV 'Software, Government'
+    const s = val.trim();
+    if (!s) return [];
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) {
+        return parsed.map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+      }
+    } catch (_) {}
+    return s
       .split(",")
-      .map((s) => s.trim().toLowerCase())
+      .map((x) => x.trim().toLowerCase())
       .filter(Boolean);
   }
   return [];
@@ -98,28 +93,82 @@ function filterByIndustries(items, industries) {
   const wanted = industries.map((s) => s.toLowerCase());
   return (items || []).filter((row) => {
     const rowIndustries = normalizeIndustries(row.job_industries);
-    // match if any requested industry is present (substring match)
-    return wanted.some((w) =>
-      rowIndustries.some((ri) => ri.includes(w))
-    );
+    return wanted.some((w) => rowIndustries.some((ri) => ri.includes(w)));
   });
 }
 
 function uniqueByJobTitle(items) {
   const seen = new Set();
   const out = [];
-
   for (const row of items || []) {
-    const titleKey = String(row.job_title || "")
-      .trim()
-      .toLowerCase();
+    const titleKey = String(row.job_title || "").trim().toLowerCase();
     if (!titleKey) continue;
-
     if (seen.has(titleKey)) continue;
     seen.add(titleKey);
     out.push(row);
   }
   return out;
+}
+
+// ---- Databricks SQL Statement Execution API helpers ----
+
+async function dbxExecuteStatement({ host, token, warehouseId, statement }) {
+  const url = `${host}/api/2.0/sql/statements`;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      warehouse_id: warehouseId,
+      statement,
+      // Make results easy to parse:
+      disposition: "INLINE",
+      format: "JSON_ARRAY", // returns each row as an array in order of columns
+      wait_timeout: "30s",
+      on_wait_timeout: "CANCEL",
+    }),
+  });
+
+  const text = await resp.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    payload = { raw: text };
+  }
+
+  if (!resp.ok) {
+    return { ok: false, status: resp.status, payload };
+  }
+
+  return { ok: true, status: resp.status, payload };
+}
+
+function rowsToObjects(payload) {
+  // With format JSON_ARRAY, payload.result.data_array is like:
+  // [ [col1, col2, ...], [col1, col2, ...] ]
+  const manifest = payload?.manifest;
+  const schemaCols = manifest?.schema?.columns || [];
+  const colNames = schemaCols.map((c) => c.name);
+
+  const data = payload?.result?.data_array || [];
+  const out = [];
+  for (const row of data) {
+    const obj = {};
+    for (let i = 0; i < colNames.length; i++) {
+      obj[colNames[i]] = row[i];
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+function escapeSqlString(s) {
+  // Basic SQL string literal escaping
+  return String(s).replace(/'/g, "''");
 }
 
 exports.handler = async (event) => {
@@ -128,71 +177,96 @@ exports.handler = async (event) => {
     const limit = parseLimitFromEvent(event);
     const countryCode = parseCountryCodeFromEvent(event);
 
-    // Build upstream URL
-    const url = new URL("/listings", LISTINGS_BASE_URL);
-    url.searchParams.set("limit", String(limit));
-    if (countryCode) url.searchParams.set("country_code", countryCode);
+    const host = process.env.DBX_HOST; // e.g. https://dbc-...cloud.databricks.com
+    const token = process.env.DBX_TOKEN;
+    const warehouseId = process.env.DBX_WAREHOUSE_ID;
 
-    // If you later add server-side filters (recommended), pass them through:
-    // if (industries.length) url.searchParams.set("industries", industries.join(","));
-
-    const resp = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-    });
-
-    const text = await resp.text();
-    let payload;
-    try {
-      payload = JSON.parse(text);
-    } catch (e) {
+    if (!host || !token || !warehouseId) {
       return {
-        statusCode: 502,
+        statusCode: 500,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: "Upstream did not return JSON",
-          status: resp.status,
-          body: text?.slice(0, 500),
+          error: "Missing Databricks config. Set DBX_HOST, DBX_TOKEN, DBX_WAREHOUSE_ID in Netlify env vars.",
         }),
       };
     }
 
-    if (!resp.ok) {
+    const catalog = process.env.DBX_CATALOG || "ml";
+    const schema = process.env.DBX_SCHEMA || "job_artifacts";
+    const table = process.env.DBX_TABLE || "job_listings";
+    const fqtn = `${catalog}.${schema}.${table}`;
+
+    // IMPORTANT: Align this SELECT with your actual table columns.
+    // Based on what you showed, apply_link/url/country_code are NOT present in the table.
+    let where = "1=1";
+    if (countryCode) {
+      // Only apply this filter if your table actually has country_code.
+      // If it doesn't, remove this block or add the column to the table.
+      // where += ` AND country_code = '${escapeSqlString(countryCode)}'`;
+    }
+
+    // Prefer newest first; if job_posted_date is string, this is best-effort.
+    // If you have ingest_utc_date/hour columns, sort by those.
+    const statement = `
+      SELECT
+        id,
+        job_title,
+        company_name,
+        job_location,
+        job_seniority_level,
+        job_employment_type,
+        job_industries,
+        job_summary,
+        job_base_pay_range,
+        job_posted_date,
+        competitiveness_score,
+        skills,
+        certifications,
+        industries,
+        achievements
+      FROM ${fqtn}
+      WHERE ${where}
+      ORDER BY job_posted_date DESC
+      LIMIT ${limit * 5}
+    `;
+
+    const res = await dbxExecuteStatement({ host, token, warehouseId, statement });
+
+    if (!res.ok) {
+      console.error("Databricks SQL error:", res.status, res.payload);
       return {
-        statusCode: resp.status,
+        statusCode: res.status,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: "Upstream error",
-          status: resp.status,
-          details: payload,
+          error: "Databricks SQL query failed",
+          status: res.status,
+          details: res.payload,
         }),
       };
     }
 
-    // Your FastAPI returns { count, items }
-    const items = Array.isArray(payload) ? payload : payload.items || [];
+    const items = rowsToObjects(res.payload);
 
-    // Optional: filter by industries on the Netlify side (since upstream may not support it yet)
+    // Optional: filter by industries client-side (works whether job_industries is array or string)
     const filtered = filterByIndustries(items, industries);
 
-    // De-dupe by title (same behavior you had before)
+    // De-dupe by title
     const unique = uniqueByJobTitle(filtered);
 
-    // You asked for /listings?limit=10 — so cap again AFTER filtering/dedupe
+    // Final cap
     const finalItems = unique.slice(0, limit);
+
     return {
-        statusCode: 200,
-        headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-            "X-Jobs-Count": String(finalItems.length),
-        },
-        body: JSON.stringify(finalItems),
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "X-Jobs-Count": String(finalItems.length),
+      },
+      body: JSON.stringify(finalItems),
     };
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    console.error("Error querying jobs:", error);
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
@@ -200,4 +274,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
