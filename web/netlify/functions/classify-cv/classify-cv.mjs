@@ -1,103 +1,70 @@
 // netlify/functions/classify-cv.mjs
 export default async (req, context) => {
   try {
-    // 1) Parse incoming body safely
+    // --- 1) Parse incoming body safely ---
     let requestBody = {};
     try {
       requestBody = await req.json();
     } catch (err) {
       console.error("Failed to parse incoming JSON:", err);
-      return new Response(JSON.stringify({ error: "Invalid JSON input" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON input" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const DATABRICKS_URL = "https://dbc-461c0150-500e.cloud.databricks.com/serving-endpoints/users/invocations";
+    // --- 2) Auth logic ---
+    const accessKeyPub = process.env.DBX_KEY;
+    const betaPassword = process.env.BETA_PASSWORD;
+
+    let accessKey = accessKeyPub;
+    if (requestBody.accessKey === betaPassword) {
+      accessKey = accessKeyPub;
     }
 
-    // 2) Auth logic
-    const accessKeyPub = process.env.DBX_KEY;           // Databricks PAT / SP token
-    
-    // always use the server-side token for Databricks calls
-    const accessKey = accessKeyPub;
-
-    // 3) Remove sensitive fields
-    if (requestBody && typeof requestBody === "object") {
+    // --- 3) Remove sensitive fields ---
+    if (requestBody) {
       delete requestBody.accessKey;
       delete requestBody.pin;
       delete requestBody.password;
     }
 
     if (!accessKey) {
-      console.error("Missing DBX_KEY env var");
-      return new Response(JSON.stringify({ error: "Missing access token" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // 4) Correct Databricks Serving URL
-    // Workspace host (no trailing slash)
-    const WORKSPACE_HOST = "https://dbc-461c0150-500e.cloud.databricks.com";
-
-    // IMPORTANT: replace with your actual serving endpoint name
-    const ENDPOINT_NAME = process.env.DBX_ENDPOINT_NAME || "competitive_pyfunc";
-
-    const DATABRICKS_URL = `${WORKSPACE_HOST}/api/2.0/serving-endpoints/${encodeURIComponent(
-      ENDPOINT_NAME
-    )}/invocations`;
-
-    // 5) Log outgoing request (careful with PII; log shape not full content if needed)
-    console.log("Calling Databricks endpoint:", ENDPOINT_NAME);
-    console.log("Databricks URL:", DATABRICKS_URL);
-    console.log("Outgoing payload keys:", Object.keys(requestBody || {}));
-
-    // 6) Send to Databricks with timeout
-    const controller = new AbortController();
-    const timeoutMs = 25_000; // Netlify functions have limits; keep this < your function timeout
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-    let response;
-    try {
-      response = await fetch(DATABRICKS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessKey}`,
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-    } catch (e) {
-      clearTimeout(timeout);
-      console.error("Fetch to Databricks failed:", e);
-      return new Response(JSON.stringify({ error: "Failed to reach Databricks", detail: String(e) }), {
-        status: 502,
-        headers: { "Content-Type": "application/json" },
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    // Read body once
-    const raw = await response.text();
-
-    if (!response.ok) {
-      console.error("Databricks error:", response.status, raw.slice(0, 1000));
       return new Response(
-        JSON.stringify({
-          error: "Databricks invocation failed",
-          status: response.status,
-          body: raw.slice(0, 5000),
-        }),
-        { status: response.status, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing access token" }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Parse JSON safely (raw might already be JSON string)
+    // --- 4) Log the full outgoing request ---
+    console.log("Sending to Databricks:", JSON.stringify(requestBody, null, 2));
+
+    // --- 5) Send to Databricks ---
+    // --- Send request ---
+    const response = await fetch(DATABRICKS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    // --- Check status ---
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Databricks error:", response.status, text);
+      return new Response(JSON.stringify({ error: text }), { status: response.status });
+    }
+
+    // --- Parse JSON safely ---
     let result;
     try {
-      result = JSON.parse(raw);
-    } catch {
-      result = { raw };
+      result = await response.json();
+    } catch (err) {
+      const rawText = await response.text();
+      console.error("Failed to parse JSON:", err, rawText);
+      result = { error: "Invalid JSON from Databricks", raw: rawText };
     }
 
     return new Response(JSON.stringify(result), {
@@ -106,9 +73,10 @@ export default async (req, context) => {
     });
   } catch (err) {
     console.error("Unexpected error:", err);
-    return new Response(JSON.stringify({ error: "Internal Server Error", detail: String(err) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Internal Server Error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
-};
+}; // <-- Closing brace added here
+
