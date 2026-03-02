@@ -177,7 +177,7 @@ exports.handler = async (event) => {
     const limit = parseLimitFromEvent(event);
     const countryCode = parseCountryCodeFromEvent(event);
 
-    const host = process.env.DBX_HOST; // e.g. https://dbc-...cloud.databricks.com
+    let host = process.env.DBX_HOST; // allow with or without https
     const token = process.env.DBX_TOKEN;
     const warehouseId = process.env.DBX_WAREHOUSE_ID;
 
@@ -186,10 +186,19 @@ exports.handler = async (event) => {
         statusCode: 500,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: "Missing Databricks config. Set DBX_HOST, DBX_TOKEN, DBX_WAREHOUSE_ID in Netlify env vars.",
+          error:
+            "Missing Databricks config. Set DBX_HOST, DBX_TOKEN, DBX_WAREHOUSE_ID in Netlify env vars.",
         }),
       };
     }
+
+    // auto-prefix scheme if user set only hostname
+    host = String(host).trim();
+    if (!host.startsWith("http://") && !host.startsWith("https://")) {
+      host = `https://${host}`;
+    }
+    // strip trailing slash for clean concatenation
+    host = host.replace(/\/+$/, "");
 
     const catalog = process.env.DBX_CATALOG || "ml";
     const schema = process.env.DBX_SCHEMA || "job_artifacts";
