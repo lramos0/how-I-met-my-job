@@ -232,7 +232,9 @@ exports.handler = async (event) => {
         skills,
         certifications,
         industries,
-        achievements
+        achievements,
+        url
+      FROM ${fqtn}
       FROM ${fqtn}
       WHERE ${where}
       ORDER BY job_posted_date DESC

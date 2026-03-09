@@ -341,8 +341,13 @@
       o.job_industries = o.job_industries ?? o.industries ?? null;
   
       // Many of your tables do not include apply_link/url; this makes UI robust.
-      o.apply_link = o.apply_link ?? o.url ?? "";
-  
+      o.apply_link =
+        o.apply_link ??
+        o.url ??
+        o.job_url ??
+        o.application_url ??
+        "";  
+
       return o;
     }
   
@@ -581,9 +586,9 @@
         const location = fixEncoding(job.job_location || "N/A");
         const jobType = fixEncoding(job.job_employment_type || "N/A");
         const seniority = fixEncoding(job.job_seniority_level || "N/A");
-  
-        const apply = safeUrl(job.apply_link || job.url);
-  
+        const apply = safeUrl(
+          job.apply_link || job.url || job.job_url || job.application_url
+        );  
         const safeTitle = escapeHtml(title);
         const safeCompany = escapeHtml(company);
         const safeLocation = escapeHtml(location);
