@@ -235,7 +235,6 @@ exports.handler = async (event) => {
         achievements,
         url
       FROM ${fqtn}
-      FROM ${fqtn}
       WHERE ${where}
       ORDER BY job_posted_date DESC
       LIMIT ${limit * 5}
