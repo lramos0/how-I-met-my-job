@@ -209,7 +209,7 @@ exports.handler = async (event) => {
     // Based on what you showed, apply_link/url/country_code are NOT present in the table.
     let monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     let primaryIndustry = industries[0];
-    let where = `ingest_utc_date >= '${monthAgo}' AND '${primaryIndustry}' IN (job_industries)`;
+    let where = `job_posted_date >= '${monthAgo}' AND country_code = '${escapeSqlString(countryCode)}' AND job_industries LIKE '%${escapeSqlString(primaryIndustry)}%'`;
     if (countryCode) {
       // Only apply this filter if your table actually has country_code.
       // If it doesn't, remove this block or add the column to the table.
