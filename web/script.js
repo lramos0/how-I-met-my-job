@@ -271,11 +271,124 @@ function displayParsedResume() {
 /* --------------------------------------------------------
    FIELD EXTRACTORS
 --------------------------------------------------------- */
-function extractName(text) {
-    // Stronger: looks for "Firstname Lastname" OR "First M. Last"
-    const match = text.match(/\b([A-Z][a-z]+)\s+(?:[A-Z]\.\s+)?([A-Z][a-z]+)\b/);
-    return match ? `${match[1]} ${match[2]}` : "Unknown";
+function extractName() {
+    const firstNames = FIRST_NAME_PARTS;
+    const lastNames = LAST_NAME_PARTS;
+    const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+    return `${first} ${last}`;
 }
+
+const FIRST_NAME_PARTS = [
+    "Aaron", "Abigail", "Adam", "Adrian", "Aiden", "Alan", "Albert", "Alex", "Alexander", "Alexis",
+    "Amanda", "Amber", "Amy", "Andrea", "Andrew", "Angela", "Anna", "Anthony", "Ashley", "Austin",
+    "Benjamin", "Beth", "Blake", "Brandon", "Brenda", "Brian", "Brittany", "Bruce", "Bryan", "Caleb",
+    "Cameron", "Carl", "Carol", "Carolyn", "Catherine", "Charles", "Charlotte", "Chelsea", "Chloe", "Chris",
+    "Christian", "Christina", "Christopher", "Cindy", "Clarence", "Claire", "Clifford", "Cody", "Connor", "Courtney",
+    "Crystal", "Cynthia", "Dakota", "Dale", "Dan", "Daniel", "Danielle", "David", "Deborah", "Dennis",
+    "Diana", "Diane", "Donald", "Donna", "Doris", "Dorothy", "Douglas", "Dylan", "Edward", "Elijah",
+    "Elizabeth", "Ellen", "Emily", "Emma", "Eric", "Ethan", "Eugene", "Evelyn", "Frank", "Gabriel",
+    "Gary", "Gerald", "Gloria", "Grace", "Gregory", "Hannah", "Harold", "Heather", "Helen", "Henry",
+    "Jack", "Jacob", "Jade", "James", "Jane", "Janet", "Janice", "Jason", "Jayden", "Jean",
+    "Jeffrey", "Jennifer", "Jeremy", "Jerry", "Jesse", "Jessica", "Joan", "Joe", "John", "Johnny",
+    "Jonathan", "Jordan", "Joseph", "Joshua", "Joyce", "Juan", "Judith", "Judy", "Julia", "Julie",
+    "Justin", "Katherine", "Kathleen", "Kathryn", "Kayla", "Keith", "Kelly", "Kenneth", "Kevin", "Kimberly",
+    "Kyle", "Larry", "Laura", "Lauren", "Lawrence", "Linda", "Lisa", "Logan", "Lori", "Louis",
+    "Madison", "Margaret", "Maria", "Marie", "Marilyn", "Mark", "Martha", "Mary", "Matthew", "Megan",
+    "Melissa", "Michael", "Michelle", "Mildred", "Morgan", "Nancy", "Nathan", "Nicholas", "Nicole", "Noah",
+    "Olivia", "Pamela", "Patricia", "Patrick", "Paul", "Paula", "Peter", "Philip", "Rachel", "Ralph",
+    "Randy", "Raymond", "Rebecca", "Richard", "Riley", "Robert", "Roger", "Ronald", "Rose", "Roy",
+    "Russell", "Ruth", "Ryan", "Samantha", "Samuel", "Sandra", "Sara", "Sarah", "Scott", "Sean",
+    "Sharon", "Shawn", "Shirley", "Sophia", "Stephanie", "Stephen", "Steven", "Susan", "Tammy", "Taylor",
+    "Teresa", "Terry", "Theresa", "Thomas", "Timothy", "Tyler", "Victoria", "Vincent", "Virginia", "Walter",
+    "Wayne", "William", "Zachary", "Aaliyah", "Abel", "Abram", "Ada", "Addison", "Adeline", "Ahmad",
+    "Alana", "Alec", "Alyssa", "Amelia", "Amir", "Anastasia", "Andre", "Angel", "Angelo", "Anita",
+    "Antonio", "Aria", "Ariana", "Arthur", "Athena", "Audrey", "Ava", "Avery", "Barry", "Beatrice",
+    "Belinda", "Ben", "Bernard", "Bernice", "Bethany", "Beverly", "Bill", "Billy", "Blanche", "Bob",
+    "Bradley", "Brady", "Brandy", "Brent", "Brett", "Brianna", "Bridget", "Brittney", "Brooke", "Bryce",
+    "Byron", "Caitlin", "Carla", "Carlos", "Carmen", "Carrie", "Casey", "Cassandra", "Cecil", "Cecilia",
+    "Cesar", "Chad", "Charlene", "Charlie", "Chester", "Cheyenne", "Claudia", "Clayton", "Colin", "Colleen",
+    "Corey", "Craig", "Daisy", "Dallas", "Damian", "Damon", "Dana", "Danny", "Darlene", "Darrell",
+    "Darren", "Daryl", "Dave", "Deanna", "Debra", "Devin", "Dewayne", "Diana", "Dolores", "Dominic",
+    "Don", "Drew", "Duane", "Dustin", "Dwayne", "Earl", "Eduardo", "Eileen", "Elaine", "Eli",
+    "Ella", "Elliott", "Erica", "Erick", "Erika", "Erin", "Ernest", "Esther", "Eva", "Evan",
+    "Faith", "Felicia", "Fernando", "Florence", "Francis", "Fred", "Frederick", "Gail", "Gavin", "Gayle",
+    "Gene", "Georgia", "Gilbert", "Gina", "Glen", "Glenn", "Gordon", "Grant", "Grayson", "Guy",
+    "Gwendolyn", "Hailey", "Haley", "Hazel", "Hector", "Holly", "Hope", "Howard", "Hunter", "Ian",
+    "Irene", "Iris", "Isaac", "Isabel", "Ivan", "Jacqueline", "Jade", "Jake", "Jared", "Jasmine",
+    "Javier", "Jay", "Jeanette", "Jeff", "Jenna", "Jennie", "Jeremiah", "Jill", "Jimmie", "Joann",
+    "Jodi", "Jody", "Jon", "Jordan", "Jorge", "Josephine", "Joy", "Juanita", "Julian", "June",
+    "Kaitlyn", "Kara", "Karen", "Karl", "Kate", "Katelyn", "Katie", "Kaylee", "Keisha", "Kelsey",
+    "Kendra", "Kenny", "Kent", "Kerry", "Kirk", "Kurt", "Kylie", "Lacey", "Lance", "Landon",
+    "Lane", "Larry", "Latoya", "Leah", "Levi", "Liam", "Lillian", "Lillie", "Lily", "Lindsay",
+    "Lindsey", "Lonnie", "Loretta", "Lori", "Lorraine", "Lucas", "Lucille", "Lucy", "Luis", "Lydia",
+    "Lynn", "Mabel", "Mackenzie", "Maddison", "Mae", "Maggie", "Malcolm", "Mallory", "Mandy", "Manuel",
+    "Marc", "Marcia", "Marco", "Marcus", "Mariah", "Mario", "Marjorie", "Marsha", "Martin", "Marvin",
+    "Mason", "Max", "Maxine", "Maya", "Meagan", "Megan", "Melanie", "Melvin", "Meredith", "Mia",
+    "Miguel", "Milton", "Mindy", "Miranda", "Misty", "Mitchell", "Molly", "Monica", "Monique", "Muriel",
+    "Myrtle", "Nadia", "Natalie", "Natasha", "Nathaniel", "Neil", "Nelson", "Nina", "Noel", "Nora",
+    "Norma", "Norman", "Oscar", "Owen", "Paisley", "Parker", "Pat", "Patty", "Peggy", "Penny",
+    "Perry", "Peyton", "Phil", "Priscilla", "Quinn", "Quentin", "Quincy", "Rachael", "Ramon", "Raquel",
+    "Reed", "Regina", "Reginald", "Renee", "Reuben", "Rex", "Ricky", "Rita", "Robyn", "Rochelle",
+    "Rodney", "Roland", "Roman", "Ron", "Ronnie", "Rosa", "Rosemary", "Ross", "Rowan", "Ruby",
+    "Rudy", "Sabrina", "Sadie", "Sally", "Salvador", "Sandy", "Santiago", "Sasha", "Savannah", "Sawyer",
+    "Seth", "Shane", "Shannon", "Shelby", "Sheldon", "Shelly", "Sherri", "Sherry", "Sierra", "Simon",
+    "Skyler", "Sonia", "Sonya", "Stacey", "Stacy", "Stanley", "Stella", "Stuart", "Sylvia", "Tabitha",
+    "Tanner", "Tara", "Ted", "Terrance", "Tiffany", "Tina", "Todd", "Tom", "Tommy", "Toni",
+    "Tony", "Tonya", "Tracey", "Traci", "Tracy", "Travis", "Trent", "Tricia", "Troy", "Trudy",
+    "Tyrone", "Uma", "Valerie", "Vanessa", "Vera", "Vernon", "Vicki", "Vickie", "Vicky", "Victor",
+    "Violet", "Vivian", "Wade", "Wallace", "Wanda", "Warren", "Wendy", "Wesley", "Whitney", "Willie",
+    "Willis", "Yolanda", "Yvonne", "Zoe", "Zachariah", "Zane", "Zara", "Zion", "Ada", "Adele"
+];
+
+const LAST_NAME_PARTS = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
+    "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
+    "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
+    "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
+    "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts",
+    "Chen", "Kim", "Patel", "Turner", "Phillips", "Evans", "Parker", "Edwards", "Collins", "Stewart",
+    "Morris", "Murphy", "Cook", "Rogers", "Morgan", "Peterson", "Cooper", "Reed", "Bailey", "Bell",
+    "Gomez", "Kelly", "Howard", "Ward", "Cox", "Diaz", "Richardson", "Wood", "Watson", "Brooks",
+    "Bennett", "Gray", "James", "Reyes", "Cruz", "Hughes", "Price", "Myers", "Long", "Foster",
+    "Sanders", "Ross", "Morales", "Powell", "Sullivan", "Russell", "Ortiz", "Jenkins", "Gutierrez", "Perry",
+    "Butler", "Barnes", "Fisher", "Henderson", "Coleman", "Simmons", "Patterson", "Jordan", "Reynolds", "Hamilton",
+    "Graham", "Shaw", "Gordon", "Wells", "West", "Cole", "Hayes", "Chavez", "Gibson", "Bryant",
+    "Ellis", "Stevens", "Murray", "Ford", "Marshall", "McDonald", "Harrison", "Ruiz", "Kennedy", "Wells",
+    "Alvarez", "Woods", "Mendoza", "Castillo", "Olson", "Webb", "Washington", "Tucker", "Freeman", "Burns",
+    "Henry", "Vasquez", "Snyder", "Simpson", "Crawford", "Jimenez", "Porter", "Mason", "Shaw", "Gordon",
+    "Wagner", "Hunter", "Romero", "Hicks", "Dixon", "Hunt", "Palmer", "Robertson", "Black", "Holmes",
+    "Stone", "Meyer", "Boyd", "Mills", "Warren", "Fox", "Rose", "Rice", "Moreno", "Schmidt",
+    "Patel", "Ferguson", "Nichols", "Herrera", "Medina", "Ryan", "Fernandez", "Weaver", "Daniels", "Stephens",
+    "Gardner", "Payne", "Kelley", "Dunn", "Pierce", "Arnold", "Tran", "Spencer", "Peters", "Hawkins",
+    "Grant", "Hansen", "Castro", "Hoffman", "Hart", "Elliott", "Cunningham", "Knight", "Bradley", "Carroll",
+    "Hudson", "Duncan", "Armstrong", "Berry", "Andrews", "Johnston", "Ray", "Lane", "Riley", "Carpenter",
+    "Perkins", "Aguilar", "Silva", "Richards", "Willis", "Matthews", "Chapman", "Lawrence", "Garza", "Vargas",
+    "Watkins", "Wheeler", "Larson", "Carlson", "Harper", "George", "Greene", "Burke", "Guzman", "Morrison",
+    "Munoz", "Jacobs", "Obrien", "Lawson", "Franklin", "Lynch", "Bishop", "Carr", "Salazar", "Austin",
+    "Mendez", "Gilbert", "Jensen", "Williamson", "Montgomery", "Harvey", "Oliver", "Howell", "Dean", "Hanson",
+    "Weber", "Garrett", "Sims", "Burton", "Fuller", "Soto", "McCoy", "Welch", "Chen", "Schultz",
+    "Walters", "Reid", "Fields", "Walsh", "Little", "Fowler", "Bowman", "Davidson", "May", "Day",
+    "Schneider", "Newman", "Brewer", "Lucas", "Holland", "Wong", "Banks", "Santos", "Curtis", "Pearson",
+    "Delgado", "Valdez", "Pennington", "Rios", "Douglas", "Sandoval", "Barrett", "Hopkins", "Keller", "Guerrero",
+    "Stanley", "Bates", "Alvarado", "Erickson", "Fletcher", "McKinney", "Page", "Dawson", "Joseph", "Marquez",
+    "Reeves", "Klein", "Espinoza", "Baldwin", "Moran", "Love", "Robbins", "Higgins", "Ball", "Cortez",
+    "Le", "Griffith", "Bowen", "Sharp", "Cummings", "Ramsey", "Hardy", "Swanson", "Barber", "Acosta",
+    "Luna", "Chandler", "Blair", "Figueroa", "Dennis", "Oconnor", "Barker", "Logan", "Huffman", "Erickson",
+    "Cobb", "Hines", "Barker", "Mullins", "Castaneda", "Maxwell", "Gallegos", "Santana", "Benson", "Rush",
+    "McGuire", "Serrano", "Buchanan", "Todd", "Hull", "Gross", "Fitzgerald", "Stokes", "Singleton", "Brock",
+    "McDaniel", "McBride", "Oneal", "Landry", "Combs", "Vaughn", "Rasmussen", "Odonnell", "Anthony", "Hull",
+    "Barrera", "Oneill", "Morse", "Conner", "Hull", "Barr", "Mcintosh", "Blankenship", "Stark", "Bass",
+    "Buckley", "Floyd", "Ritter", "Hanna", "Santos", "McClain", "Newton", "Cantrell", "Barrera", "English",
+    "Chung", "Kramer", "Heath", "Hahn", "Middleton", "McLaughlin", "Lam", "Orr", "Jarvis", "McKenzie",
+    "Boyer", "McMahon", "Dickerson", "Solomon", "Glenn", "Parsons", "McDowell", "Rush", "Huber", "Morse",
+    "Berger", "McKee", "Strickland", "Crane", "Haley", "Barton", "Randolph", "Underwood", "Singleton", "Wilkinson",
+    "Duran", "Horne", "Shepherd", "McClure", "Barrera", "Poole", "Calhoun", "Medina", "Vega", "Hodge",
+    "McPherson", "Tyler", "McCall", "Sampson", "Briggs", "Hull", "Mullen", "Valencia", "Barr", "Hull",
+    "Meadows", "Blackburn", "Dudley", "Nash", "Bruce", "Livingston", "Marks", "Cantrell", "Humphrey", "Dickson",
+    "Summers", "Dillon", "Farley", "McKenzie", "Winters", "Branch", "Cherry", "Bass", "Hull", "Barr",
+    "Barrera", "Poole", "Calhoun", "Medina", "Vega", "Hodge", "McPherson", "Tyler", "McCall", "Sampson"
+];
 
 
 async function extractSkills(text) {
