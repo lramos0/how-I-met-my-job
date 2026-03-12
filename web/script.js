@@ -57,7 +57,7 @@ function stopBackendStatusAnimation(statusEl, finalText) {
    We sort by (y desc, x asc) and insert spaces where x-gap indicates word boundary.
    If the PDF has no text layer (image-only / scanned), we fall back to OCR via Tesseract.js.
 --------------------------------------------------------- */
-const PDF_OCR_MIN_TEXT = 50; // below this we try OCR
+const PDF_OCR_MIN_TEXT = 200; // below this we try OCR
 
 async function extractPdfText(file, statusEl) {
     const arrayBuffer = await file.arrayBuffer();
