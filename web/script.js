@@ -53,6 +53,8 @@ function stopBackendStatusAnimation(statusEl, finalText) {
 
 /* --------------------------------------------------------
    PDF TEXT EXTRACTION
+   PDF.js returns items in content-stream order, not reading order.
+   We sort by (y desc, x asc) and insert spaces where x-gap indicates word boundary.
 --------------------------------------------------------- */
 async function extractPdfText(file) {
     const arrayBuffer = await file.arrayBuffer();
@@ -64,27 +66,44 @@ async function extractPdfText(file) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
 
+        const items = textContent.items.map((item) => ({
+            str: item.str,
+            x: item.transform[4],
+            y: item.transform[5],
+            width: typeof item.width === "number" ? item.width : 0
+        }));
+
+        // Reading order: top-to-bottom (y descending in PDF coords), left-to-right (x ascending)
+        items.sort((a, b) => b.y - a.y || a.x - b.x);
+
+        const Y_EPS = 3;   // same line if y within this
+        const SPACE_GAP = 2; // min x-gap to insert space between words
+
         let pageText = "";
-        let lastY = null;
+        let prevY = null;
+        let prevEndX = null;
 
-        for (const item of textContent.items) {
-            const text = item.str;
+        for (const item of items) {
+            const sameLine = prevY !== null && Math.abs(item.y - prevY) <= Y_EPS;
 
-            // detect line breaks using vertical movement
-            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
+            if (prevY !== null && !sameLine) {
                 pageText += "\n";
+            } else if (sameLine && prevEndX !== null) {
+                const gap = item.x - prevEndX;
+                if (gap > SPACE_GAP) pageText += " ";
             }
 
-            pageText += text;
-            lastY = item.transform[5];
+            pageText += item.str;
+            prevY = item.y;
+            prevEndX = item.width > 0 ? item.x + item.width : item.x + (item.str.length * 5);
         }
 
         finalText += pageText + "\n\n";
     }
 
-    // Clean up weird double-spacing PDF.js often leaves
+    // Normalize: collapse multiple spaces (keep newlines), then collapse excess newlines
     finalText = finalText
-        .replace(/\s{2,}/g, " ")
+        .replace(/[ \t]{2,}/g, " ")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 
@@ -195,6 +214,12 @@ async function parseResume() {
     } catch (err) {
         console.error(err);
         status.textContent = "❌ Error reading file.";
+        return;
+    }
+
+    const trimmed = (resumeText || "").trim();
+    if (trimmed.length < 50) {
+        status.textContent = "❌ Could not extract enough text. The file may be image-only (scanned PDF) or corrupted. Try a text-based PDF or DOCX.";
         return;
     }
 
