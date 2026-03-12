@@ -55,8 +55,11 @@ function stopBackendStatusAnimation(statusEl, finalText) {
    PDF TEXT EXTRACTION
    PDF.js returns items in content-stream order, not reading order.
    We sort by (y desc, x asc) and insert spaces where x-gap indicates word boundary.
+   If the PDF has no text layer (image-only / scanned), we fall back to OCR via Tesseract.js.
 --------------------------------------------------------- */
-async function extractPdfText(file) {
+const PDF_OCR_MIN_TEXT = 200; // below this we try OCR
+
+async function extractPdfText(file, statusEl) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
@@ -107,7 +110,49 @@ async function extractPdfText(file) {
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 
+    // Image-only PDF: no or almost no text layer — run OCR
+    // Use file again so we get a fresh ArrayBuffer; the one we have may be detached by PDF.js
+    if (finalText.trim().length < PDF_OCR_MIN_TEXT && typeof Tesseract !== "undefined") {
+        if (statusEl) statusEl.textContent = "📷 Image-only PDF detected. Running OCR (this may take a moment)…";
+        try {
+            const ocrText = await extractPdfTextViaOcr(file, pdf.numPages, statusEl);
+            if (ocrText && ocrText.trim().length >= PDF_OCR_MIN_TEXT) return ocrText;
+        } catch (e) {
+            console.warn("OCR fallback failed:", e);
+        }
+    }
+
     return finalText;
+}
+
+/**
+ * Extract text from a PDF by rendering each page to canvas and running Tesseract OCR.
+ * Used when the PDF has no text layer (scanned/image-only).
+ * Accepts File (not ArrayBuffer) so we read a fresh buffer — the original may be detached by PDF.js.
+ */
+async function extractPdfTextViaOcr(file, numPages, statusEl) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const scale = 2; // higher scale improves OCR accuracy
+    const out = [];
+
+    for (let i = 1; i <= numPages; i++) {
+        if (statusEl) statusEl.textContent = `📷 OCR: page ${i} of ${numPages}…`;
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const { data: { text } } = await Tesseract.recognize(canvas, "eng", {
+            logger: () => {}
+        });
+        if (text && text.trim()) out.push(text.trim());
+    }
+
+    return out.join("\n\n");
 }
 
 /* --------------------------------------------------------
@@ -205,7 +250,7 @@ async function parseResume() {
     let resumeText = "";
     try {
         if (file.name.endsWith(".pdf")) {
-            resumeText = await extractPdfText(file);
+            resumeText = await extractPdfText(file, status);
         } else if (file.name.endsWith(".docx")) {
             resumeText = await extractDocxText(file);
         } else {
