@@ -111,10 +111,11 @@ async function extractPdfText(file, statusEl) {
         .trim();
 
     // Image-only PDF: no or almost no text layer — run OCR
+    // Use file again so we get a fresh ArrayBuffer; the one we have may be detached by PDF.js
     if (finalText.trim().length < PDF_OCR_MIN_TEXT && typeof Tesseract !== "undefined") {
         if (statusEl) statusEl.textContent = "📷 Image-only PDF detected. Running OCR (this may take a moment)…";
         try {
-            const ocrText = await extractPdfTextViaOcr(arrayBuffer, pdf.numPages, statusEl);
+            const ocrText = await extractPdfTextViaOcr(file, pdf.numPages, statusEl);
             if (ocrText && ocrText.trim().length >= PDF_OCR_MIN_TEXT) return ocrText;
         } catch (e) {
             console.warn("OCR fallback failed:", e);
@@ -127,8 +128,10 @@ async function extractPdfText(file, statusEl) {
 /**
  * Extract text from a PDF by rendering each page to canvas and running Tesseract OCR.
  * Used when the PDF has no text layer (scanned/image-only).
+ * Accepts File (not ArrayBuffer) so we read a fresh buffer — the original may be detached by PDF.js.
  */
-async function extractPdfTextViaOcr(arrayBuffer, numPages, statusEl) {
+async function extractPdfTextViaOcr(file, numPages, statusEl) {
+    const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const scale = 2; // higher scale improves OCR accuracy
     const out = [];
