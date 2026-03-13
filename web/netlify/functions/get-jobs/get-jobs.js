@@ -1,8 +1,13 @@
 // netlify/functions/get-jobs.js
 //
 // Queries Databricks UC table via Statement Execution API.
+// Caches full jobs result in Netlify Blobs for 7 days; only queries DB when cache is missing or expired.
 // GET  /.netlify/functions/get-jobs?limit=10&industries=Software,Government&country_code=US
 // POST /.netlify/functions/get-jobs { "limit": 10, "industries": ["Software"], "country_code": "US" }
+
+const CACHE_KEY = "jobs-full";
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_FETCH_LIMIT = 500; // rows to fetch and cache when refilling
 
 function parseJsonBody(event) {
   if (event.httpMethod !== "POST" || !event.body) return null;
@@ -171,13 +176,57 @@ function escapeSqlString(s) {
   return String(s).replace(/'/g, "''");
 }
 
+function applyFiltersAndSlice(items, industries, limit) {
+  const filtered = filterByIndustries(items, industries);
+  const unique = uniqueByJobTitle(filtered);
+  return unique.slice(0, limit);
+}
+
+function successResponse(finalItems, fromCache = false) {
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": fromCache ? "public, max-age=604800" : "public, max-age=604800", // 7 days
+      "X-Jobs-Count": String(finalItems.length),
+      "X-Jobs-Cache": fromCache ? "HIT" : "MISS",
+    },
+    body: JSON.stringify(finalItems),
+  };
+}
+
 exports.handler = async (event) => {
   try {
     const industries = parseIndustriesFromEvent(event);
     const limit = parseLimitFromEvent(event);
     const countryCode = parseCountryCodeFromEvent(event);
 
-    let host = process.env.DBX_HOST; // allow with or without https
+    // ---- Try cache first (Netlify Blobs, 7-day TTL) ----
+    let items = null;
+    try {
+      const { getStore } = await import("@netlify/blobs");
+      const store = getStore("get-jobs-cache");
+      const raw = await store.get(CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.items) && parsed.cachedAt) {
+          const age = Date.now() - parsed.cachedAt;
+          if (age < CACHE_TTL_MS) {
+            items = parsed.items;
+          }
+        }
+      }
+    } catch (blobErr) {
+      console.warn("Cache read failed, will query DB:", blobErr.message);
+    }
+
+    if (items !== null) {
+      const finalItems = applyFiltersAndSlice(items, industries, limit);
+      return successResponse(finalItems, true);
+    }
+
+    // ---- Cache miss or expired: query Databricks ----
+    let host = process.env.DBX_HOST;
     const token = process.env.DBX_TOKEN;
     const warehouseId = process.env.DBX_WAREHOUSE_ID;
 
@@ -192,12 +241,10 @@ exports.handler = async (event) => {
       };
     }
 
-    // auto-prefix scheme if user set only hostname
     host = String(host).trim();
     if (!host.startsWith("http://") && !host.startsWith("https://")) {
       host = `https://${host}`;
     }
-    // strip trailing slash for clean concatenation
     host = host.replace(/\/+$/, "");
 
     const catalog = process.env.DBX_CATALOG || "ml";
@@ -205,17 +252,7 @@ exports.handler = async (event) => {
     const table = process.env.DBX_TABLE || "job_listings";
     const fqtn = `${catalog}.${schema}.${table}`;
 
-    // IMPORTANT: Align this SELECT with your actual table columns.
-    // Based on what you showed, apply_link/url/country_code are NOT present in the table.
     let where = "1=1";
-    if (countryCode) {
-      // Only apply this filter if your table actually has country_code.
-      // If it doesn't, remove this block or add the column to the table.
-      // where += ` AND country_code = '${escapeSqlString(countryCode)}'`;
-    }
-
-    // Prefer newest first; if job_posted_date is string, this is best-effort.
-    // If you have ingest_utc_date/hour columns, sort by those.
     const statement = `
       SELECT
         id,
@@ -237,7 +274,7 @@ exports.handler = async (event) => {
       FROM ${fqtn}
       WHERE ${where}
       ORDER BY job_posted_date DESC
-      LIMIT ${limit * 5}
+      LIMIT ${CACHE_FETCH_LIMIT}
     `;
 
     const res = await dbxExecuteStatement({ host, token, warehouseId, statement });
@@ -255,26 +292,19 @@ exports.handler = async (event) => {
       };
     }
 
-    const items = rowsToObjects(res.payload);
+    items = rowsToObjects(res.payload);
 
-    // Optional: filter by industries client-side (works whether job_industries is array or string)
-    const filtered = filterByIndustries(items, industries);
+    // Persist to cache for 7 days
+    try {
+      const { getStore } = await import("@netlify/blobs");
+      const store = getStore("get-jobs-cache");
+      await store.set(CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), items }));
+    } catch (blobErr) {
+      console.warn("Cache write failed:", blobErr.message);
+    }
 
-    // De-dupe by title
-    const unique = uniqueByJobTitle(filtered);
-
-    // Final cap
-    const finalItems = unique.slice(0, limit);
-
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "X-Jobs-Count": String(finalItems.length),
-      },
-      body: JSON.stringify(finalItems),
-    };
+    const finalItems = applyFiltersAndSlice(items, industries, limit);
+    return successResponse(finalItems, false);
   } catch (error) {
     console.error("Error querying jobs:", error);
     return {
