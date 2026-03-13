@@ -19,7 +19,7 @@
     },
     "homepage": "https://github.com/lramos0/how-I-met-my-job#readme",
     "dependencies": {
-        "@netlify/blobs": "^11.0.0",
+        "@netlify/blobs": "^10.7.2",
         "@supabase/supabase-js": "^2.84.0"
     }
 }
