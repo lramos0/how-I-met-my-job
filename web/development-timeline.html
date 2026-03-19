@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mewannajob.com — Analytics First Development Timeline</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg2: #0d1b2f;
+      --card: rgba(14, 27, 46, 0.78);
+      --line: rgba(67, 224, 255, 0.28);
+      --cyan: #43e0ff;
+      --blue: #62a8ff;
+      --violet: #8e7dff;
+      --green: #65f5b2;
+      --text: #eaf6ff;
+      --muted: #97afc6;
+      --glow: 0 0 28px rgba(67, 224, 255, 0.22);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(67,224,255,0.12), transparent 26%),
+        radial-gradient(circle at 85% 15%, rgba(142,125,255,0.12), transparent 24%),
+        radial-gradient(circle at 70% 80%, rgba(101,245,178,0.08), transparent 28%),
+        linear-gradient(180deg, var(--bg), #050b14 55%, #03070d 100%);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .grid {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(98,168,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(98,168,255,0.06) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.08));
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      padding: 28px;
+      border: 1px solid rgba(67,224,255,0.18);
+      background: linear-gradient(180deg, rgba(10,23,39,0.82), rgba(8,17,31,0.74));
+      border-radius: 28px;
+      box-shadow: var(--glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -40% auto;
+      width: 380px;
+      height: 380px;
+      background: radial-gradient(circle, rgba(67,224,255,0.14), transparent 60%);
+      filter: blur(6px);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(67,224,255,0.18);
+      background: rgba(67,224,255,0.08);
+      color: var(--cyan);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 4.4rem);
+      line-height: 0.96;
+      margin: 20px 0 14px;
+      letter-spacing: -0.04em;
+      max-width: 900px;
+    }
+
+    .lead {
+      max-width: 850px;
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .stat {
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(98,168,255,0.14);
+      background: rgba(255,255,255,0.025);
+      backdrop-filter: blur(8px);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .section-title {
+      margin: 50px 0 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .section-title::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 16px rgba(67,224,255,0.8);
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 26px;
+      margin-top: 8px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(67,224,255,0.55), rgba(142,125,255,0.35), rgba(101,245,178,0.35));
+      box-shadow: 0 0 18px rgba(67,224,255,0.15);
+    }
+
+    .phase {
+      position: relative;
+      margin: 0 0 22px;
+      padding: 22px 22px 20px;
+      background: var(--card);
+      border: 1px solid rgba(98,168,255,0.14);
+      border-radius: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.22), var(--glow);
+    }
+
+    .phase::before {
+      content: "";
+      position: absolute;
+      left: -24px;
+      top: 26px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      border: 2px solid #061221;
+      box-shadow: 0 0 20px rgba(67,224,255,0.45);
+    }
+
+    .phase-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .phase-kicker {
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--cyan);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .phase h3 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .phase-time {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(101,245,178,0.18);
+      background: rgba(101,245,178,0.08);
+      color: var(--green);
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .phase p {
+      color: var(--muted);
+      line-height: 1.7;
+      margin: 0 0 14px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      margin-top: 14px;
+    }
+
+    .mini {
+      border-radius: 18px;
+      padding: 16px;
+      border: 1px solid rgba(67,224,255,0.12);
+      background: rgba(255,255,255,0.025);
+    }
+
+    .mini h4 {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    li + li { margin-top: 8px; }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      color: var(--text);
+      border: 1px solid rgba(142,125,255,0.18);
+      background: rgba(142,125,255,0.08);
+    }
+
+    .principles {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .principle {
+      padding: 20px;
+      border-radius: 22px;
+      border: 1px solid rgba(98,168,255,0.12);
+      background: linear-gradient(180deg, rgba(14,27,46,0.72), rgba(8,17,31,0.8));
+      box-shadow: var(--glow);
+    }
+
+    .principle .num {
+      font-size: 0.78rem;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .principle h4 {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+    }
+
+    .principle p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .footer-note {
+      margin-top: 36px;
+      padding: 18px 20px;
+      border-radius: 18px;
+      border: 1px solid rgba(67,224,255,0.14);
+      background: rgba(67,224,255,0.05);
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    @media (max-width: 960px) {
+      .hero-stats,
+      .principles,
+      .two-col {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .wrap {
+        width: min(100% - 20px, 1180px);
+        padding-top: 20px;
+      }
+
+      .hero,
+      .phase,
+      .principle {
+        border-radius: 22px;
+      }
+
+      .hero-stats,
+      .principles,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline {
+        padding-left: 22px;
+      }
+
+      h1 {
+        line-height: 1.02;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid"></div>
+
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow">mewannajob.com · analytics first initiative</div>
+      <h1>Development Timeline for an Analytics-First Job Market Intelligence Experience</h1>
+      <p class="lead">
+        This roadmap frames mewannajob.com as a product that turns raw job and resume activity into timestamped,
+        queryable data for users to conduct analysis. The strategy starts with trustworthy data foundations, then layers in
+        snapshots, analytics, redacted.
+      </p>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-label">Core Data Objects</div>
+          <div class="stat-value">Timestamped resumes + jobs</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Launch Value</div>
+          <div class="stat-value">Article-backed free snapshots</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Paid Offering</div>
+          <div class="stat-value">Monthly snapshot access</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Execution Model</div>
+          <div class="stat-value">Browser analytics</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-title">Timeline</div>
+    <section class="timeline">
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 01</div>
+            <h3>Brick Laying</h3>
+          </div>
+          <div class="phase-time">Weeks 1–4</div>
+        </div>
+        <p>
+          Rebuild the persistence layer for jobs and resumes so the system can serve efficient, permissioned,
+          timestamp-aware data retrieval. This phase is the infrastructure bet that enables every downstream analytics
+          feature.
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Primary goals</h4>
+            <ul>
+              <li>Refactor jobs and resumes tables to support time-bounded querying and snapshot generation.</li>
+              <li>Represent both data families as durable objects with timestamps and related metadata.</li>
+              <li>Design permission-aware access patterns so future free and paid datasets can be gated cleanly.</li>
+              <li>Support "glimpses" between date ranges such as 2026-02-01 to 2026-02-28.</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Deliverables</h4>
+            <ul>
+              <li>Schema changes for temporal records</li>
+              <li>Snapshot eligibility rules</li>
+              <li>Metadata normalization layer</li>
+              <li>Access-control strategy for dataset tiers</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">Temporal querying</span>
+          <span class="tag">Permissioned access</span>
+          <span class="tag">Snapshot-ready storage</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 02</div>
+            <h3>Snapshot Engine</h3>
+          </div>
+          <div class="phase-time">Weeks 5–7</div>
+        </div>
+        <p>
+          Turn the new data model into a reliable snapshot pipeline. Snapshots are cleaned, time-specific subsets of the
+          underlying data, prepared for exploration and publication. These datasets become both product assets and
+          evidence inside content.
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Snapshot behavior</h4>
+            <ul>
+              <li>Generate subsets for tightly defined date ranges.</li>
+              <li>Remove duplicates, anomalies, and sensitive information before distribution.</li>
+              <li>Package resumes, job listings, and metadata into a browser-consumable format.</li>
+              <li>Make snapshots downloadable and loadable into the analytics experience.</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Launch assumptions</h4>
+            <ul>
+              <li>Free users access article-linked evidence snapshots.</li>
+              <li>Paid users gain access to recurring monthly snapshots.</li>
+              <li>Snapshot docs define provenance, date range, and coverage.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">Clean-room datasets</span>
+          <span class="tag">SEO evidence payloads</span>
+          <span class="tag">Monthly premium archives</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 03</div>
+            <h3>Article-to-Data Experience</h3>
+          </div>
+          <div class="phase-time">Weeks 8–9</div>
+        </div>
+        <p>
+          Create the product loop between editorial content and analytics. Articles produced by the SEO article generator
+          should not just cite trends, but expose the exact snapshot evidence behind those claims.
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>User experience</h4>
+            <ul>
+              <li>Readers click through from article evidence to the matching dataset.</li>
+              <li>Datasets can be downloaded or opened immediately in-browser.</li>
+              <li>Free experiences emphasize discoverability and trust through transparent evidence.</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Product impact</h4>
+            <ul>
+              <li>Turns content into a data acquisition funnel.</li>
+              <li>Establishes mewannajob.com as both publisher and analytics source.</li>
+              <li>Builds habit around interacting with structured labor-market evidence.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">Content flywheel</span>
+          <span class="tag">Evidence UX</span>
+          <span class="tag">Trust by transparency</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 04</div>
+            <h3>Analytics Platform</h3>
+          </div>
+          <div class="phase-time">Weeks 10–13</div>
+        </div>
+        <p>
+          redacted
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Core capabilities</h4>
+            <ul>
+              <li>redacted</li>
+              <li>redacted</li>
+              <li>redacted</li>
+              <li>Preserve a fast, privacy-aware experience.</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Technical posture</h4>
+            <ul>
+              <li>redacted</li>
+              <li>redacted</li>
+              <li>Dataset parsing and widget orchestration</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">redacted</span>
+          <span class="tag">redacted</span>
+          <span class="tag">Vanilla JS core</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 05</div>
+            <h3>redacted</h3>
+          </div>
+          <div class="phase-time">Weeks 14–16</div>
+        </div>
+        <p>
+          redacted
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Why it matters</h4>
+            <ul>
+              <li>redacted</li>
+              <li>redacted</li>
+              <li>Creates a product identity around lightweight, inspectable analytics.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">redacted</span>
+          <span class="tag">redacted</span>
+          <span class="tag">redacted</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 06</div>
+            <h3>Dynamic Visual Widgets</h3>
+          </div>
+          <div class="phase-time">Weeks 17–18</div>
+        </div>
+        <p>
+            redacted
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Widget examples</h4>
+            <ul>
+              <li>Trend lines over time windows</li>
+              <li>Role, company, and market segment comparisons</li>
+              <li>Resume trait distributions and job demand views</li>
+              <li>Article-embedded evidence visuals</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Success criteria</h4>
+            <ul>
+              <li>The analytics experience feels exploratory, fast, and technical.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">Interactive charts</span>
+          <span class="tag">Dynamic rendering</span>
+        </div>
+      </article>
+
+      <article class="phase">
+        <div class="phase-head">
+          <div>
+            <div class="phase-kicker">Phase 07</div>
+            <h3>Production Rollout & Monetization</h3>
+          </div>
+          <div class="phase-time">Weeks 19–20</div>
+        </div>
+        <p>
+          Formalize the analytics-first launch. Free users get curated evidence snapshots attached to published articles,
+          while paid users get broader recurring access to monthly datasets and the deeper exploratory workflow.
+        </p>
+        <div class="two-col">
+          <div class="mini">
+            <h4>Free tier</h4>
+            <ul>
+              <li>Access to select snapshots used as evidence in SEO-generated articles.</li>
+              <li>Enough functionality to demonstrate credibility and product value.</li>
+            </ul>
+          </div>
+          <div class="mini">
+            <h4>Paid tier</h4>
+            <ul>
+              <li>Monthly snapshot access from the start.</li>
+              <li>Deeper use of the analytics workflow and visual tools.</li>
+              <li>Foundation for future premium data products.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">Free-to-paid funnel</span>
+          <span class="tag">Recurring data product</span>
+          <span class="tag">Analytics-first positioning</span>
+        </div>
+      </article>
+    </section>
+
+    <div class="section-title">Guiding Principles</div>
+    <section class="principles">
+      <article class="principle">
+        <div class="num">01 · Evidence over claims</div>
+        <h4>Every insight should be traceable</h4>
+        <p>
+          The article layer should point users to the exact dataset slices that justify the narrative, making snapshots a
+          credibility engine rather than just a download feature.
+        </p>
+      </article>
+      <article class="principle">
+        <div class="num">02 · Redacted </div>
+        <h4>redacted</h4>
+        <p>
+           redacted
+        </p>
+      </article>
+      <article class="principle">
+        <div class="num">03 · Productize the data exhaust</div>
+        <h4>Snapshots become the first premium artifact</h4>
+        <p>
+          The same internal data collection system that powers intelligence can become a usable asset once it is
+          clean, scoped, permissioned, and easy to explore.
+        </p>
+      </article>
+    </section>
+
+    <div class="footer-note">
+      <strong>Positioning statement:</strong> mewannajob.com evolves from a jobs product into a browser-native labor
+      market intelligence system, where timestamped jobs and resumes are transformed into explorable evidence,
+      analytics.
+    </div>
+  </main>
+</body>
+</html>
