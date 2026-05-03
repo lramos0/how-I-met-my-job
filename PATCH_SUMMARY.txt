@@ -1,0 +1,17 @@
+HiringCafe patch summary
+
+Changed files:
+- app.js
+- lib/fortune500.js
+- forum.js
+- service-worker.js
+
+What changed:
+1. Job loading now merges the first 4,000 bundled/local jobs with 4 remote Job Data Pool batches of 500 each, targeting 6,000 total loaded listings after dedupe.
+2. Job Data Pool requests now include limit=500 plus offset/page per batch, with GET first and POST fallback.
+3. Company logos no longer use Clearbit. Job cards and Fortune helpers now use Google favicon-based logos with inline SVG initials fallback.
+4. Homepage count display now shows a cosmetic network-style counter starting around 3,100,000 jobs and 5,600,000 companies, while still including the real loaded filtered count.
+5. Added service-worker.js to retain/update the cosmetic counter state.
+6. Local account creation now initializes a persistent uid and editable profile data.
+7. Account panel now shows display name/headline plus saved-job, post, and upvote stats.
+8. Added a forum implementation that tracks posts and per-user upvotes in local state, with Firebase-compatible save hooks through app.js.

@@ -1,15 +1,21 @@
 (() => {
   const DATA_PATHS = ["data/jobs_restored.csv", "./data/jobs_restored.csv", "/data/jobs_restored.csv"];
-  /** Canonical Job Data Pool HTTP API (see https://jobdatapool.com/) — max 500 listings per request; we merge batches up to LISTINGS_MAX. */
-  const API_JOBS = "https://api.jobdatapool.com/v1/jobs";
-  const LISTINGS_MAX = Math.min(10000, Number(window.JDP_LISTINGS_MAX) || 10000);
-  const CACHE_KEY = "jdp_sample_jobs_v1";
+  /** Canonical Job Data Pool HTTP API (see https://jobdatapool.com/) — currently requested in 500-listing pages. */
+  const API_JOBS = window.JDP_API_JOBS || "https://api.jobdatapool.com/v1/jobs";
+  const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);
+  const REMOTE_BATCH_SIZE = Math.min(500, Number(window.JDP_REMOTE_BATCH_SIZE) || 500);
+  const REMOTE_BATCHES = Math.min(4, Number(window.JDP_REMOTE_BATCHES) || 4);
+  const LISTINGS_MAX = Math.min(6000, Number(window.JDP_LISTINGS_MAX) || (LOCAL_LISTINGS_MAX + (REMOTE_BATCH_SIZE * REMOTE_BATCHES)));
+  const CACHE_KEY = "jdp_merged_jobs_v2";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
-  const ACCOUNT_KEY = "hc_account_v1";
-  const STATE_KEY = "hc_job_state_v1";
+  const ACCOUNT_KEY = "hc_account_v2";
+  const STATE_KEY = "hc_job_state_v2";
+  const PROFILE_KEY = "hc_profile_v1";
+  const COUNTER_KEY = "hc_live_counters_v1";
   const app = {
-    jobs: [], filtered: [], savedOnly: false, user: null, db: null, authReady: false,
-    state: { saved: {}, applied: {}, hidden: {} },
+    jobs: [], filtered: [], savedOnly: false, user: null, profile: null, db: null, authReady: false,
+    state: { saved: {}, applied: {}, hidden: {}, posts: {}, upvotes: {}, postVotes: {} },
+    counters: null,
     els: {},
     filterMustHavePay: false,
     filterMustHaveEmployment: false,
@@ -19,11 +25,20 @@
 
   window.HiringCafeAuth = {
     getUser: () => app.user,
+    getProfile: () => app.profile,
+    getState: () => app.state,
     isLoggedIn: () => !!app.user,
     promptLogin: (message) => {
       if (app.els.accountPanel) app.els.accountPanel.classList.remove("hidden");
       if (app.els.accountStatus && message) app.els.accountStatus.textContent = message;
       app.els.accountButton?.focus();
+    },
+    saveForumState: async (patch = {}) => {
+      app.state = { ...defaultState(), ...app.state, ...patch };
+      await saveState();
+      updateAccountUi();
+      window.dispatchEvent(new CustomEvent("hiringcafe:forumstate", { detail: { state: app.state } }));
+      return app.state;
     }
   };
 
@@ -38,6 +53,8 @@
       app.jobs = await loadJobsDataset();
       populateFilters(app.jobs);
       await loadState();
+      restoreProfile();
+      initVanityCounters();
       applyFilters();
       if (!/Ready/i.test(app.els.syncStatus.textContent || "")) setSync("Ready");
     } catch (error) {
@@ -276,28 +293,49 @@
   }
 
   /**
-   * Fetches at most LISTINGS_MAX listings from the API (batched at 500/request), deduped.
+   * Fetches exactly the requested four 500-listing pages when the API is reachable, then dedupes.
+   * Offset/page params are included so proxies or future API versions can return distinct pages.
    */
   async function fetchSampleListingsFromApi(){
     const headers = { Accept: "application/json" };
-    const perReq = 500;
     const batches = [];
+    const failures = [];
 
-    const res1 = await fetch(`${API_JOBS}?${new URLSearchParams({ limit: String(perReq), country_code: "US" })}`, { headers });
-    if (!res1.ok) throw new Error(`Job Data Pool API returned ${res1.status}`);
-    batches.push(...extractJobsPayload(await res1.json()));
-
-    if (batches.length < LISTINGS_MAX) {
-      const res2 = await fetch(API_JOBS, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: perReq, country_code: "US" }),
+    for (let batch = 0; batch < REMOTE_BATCHES; batch++) {
+      const offset = batch * REMOTE_BATCH_SIZE;
+      const params = new URLSearchParams({
+        limit: String(REMOTE_BATCH_SIZE),
+        offset: String(offset),
+        page: String(batch + 1),
+        country_code: "US"
       });
-      if (res2.ok) batches.push(...extractJobsPayload(await res2.json()));
+      try {
+        const res = await fetch(`${API_JOBS}?${params}`, { headers, cache: "no-store" });
+        if (!res.ok) throw new Error(`GET batch ${batch + 1} returned ${res.status}`);
+        batches.push(...extractJobsPayload(await res.json()));
+        continue;
+      } catch (getErr) {
+        try {
+          const res = await fetch(API_JOBS, {
+            method: "POST",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ limit: REMOTE_BATCH_SIZE, offset, page: batch + 1, country_code: "US" }),
+          });
+          if (!res.ok) throw new Error(`POST batch ${batch + 1} returned ${res.status}`);
+          batches.push(...extractJobsPayload(await res.json()));
+        } catch (postErr) {
+          failures.push(postErr.message || getErr.message || String(postErr || getErr));
+        }
+      }
     }
 
-    const unique = dedupeCsvRows(batches);
-    return unique.slice(0, LISTINGS_MAX);
+    if (!batches.length && failures.length) throw new Error(failures[0]);
+    return dedupeCsvRows(batches).slice(0, REMOTE_BATCH_SIZE * REMOTE_BATCHES);
+  }
+
+  async function loadLocalJobsRows(){
+    const csv = await loadCsv();
+    return parseCsv(csv).slice(0, LOCAL_LISTINGS_MAX);
   }
 
   async function loadJobsDataset(){
@@ -307,33 +345,29 @@
     if (!forceLocal) {
       const cached = readJobsCache();
       if (cached && cached.length) {
-        setSync(`Ready — ${cached.length.toLocaleString()} listings (cached sample)`);
+        setSync(`Ready — ${cached.length.toLocaleString()} merged listings (cached)`);
         return cached;
       }
     }
 
+    setSync(`Loading ${LOCAL_LISTINGS_MAX.toLocaleString()} bundled listings…`);
+    const localRows = await loadLocalJobsRows();
+    let remoteRows = [];
+
     if (!forceLocal) {
       try {
-        setSync("Fetching sample from Job Data Pool…");
-        const rows = await fetchSampleListingsFromApi();
-        const jobs = normalizeRows(rows);
-        if (jobs.length) {
-          writeJobsCache(jobs);
-          setSync(`Ready — up to ${LISTINGS_MAX.toLocaleString()} sampled listings`);
-          return jobs;
-        }
+        setSync(`Fetching ${REMOTE_BATCHES} × ${REMOTE_BATCH_SIZE} from Job Data Pool…`);
+        remoteRows = await fetchSampleListingsFromApi();
       } catch (err) {
-        console.warn("Job Data Pool API unavailable, trying bundled CSV…", err);
+        console.warn("Job Data Pool API unavailable; using bundled jobs only.", err);
       }
     }
 
-    setSync("Loading bundled dataset…");
-    const csv = await loadCsv();
-    const allRows = parseCsv(csv);
-    const capped = allRows.slice(0, LISTINGS_MAX);
-    const jobs = normalizeRows(capped);
+    const mergedRows = dedupeCsvRows([...localRows, ...remoteRows]).slice(0, LISTINGS_MAX);
+    const jobs = normalizeRows(mergedRows);
     if (jobs.length) writeJobsCache(jobs);
-    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} listings (local)` : "Ready");
+    const remoteMsg = remoteRows.length ? ` + ${remoteRows.length.toLocaleString()} live` : " + live API unavailable";
+    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} merged listings (${localRows.length.toLocaleString()} local${remoteMsg})` : "Ready");
     return jobs;
   }
 
@@ -375,6 +409,7 @@
         pay: clean(pay), posted: r.job_posted_date || r.ingest_utc_date || "", score: Number(r.competitiveness_score || 0),
         skills: splitTags(r.skills), certifications: splitTags(r.certifications), achievements: splitTags(r.achievements),
         url: r.url || "", apply: r.apply_link || r.url || "", country: r.country_code || "US",
+        companyDomain: companyDomain(clean(r.company_name), r.apply_link || r.url || ""),
         cityKey: cityKey(cleanLocation(r.job_location))
       };
     });
@@ -439,7 +474,7 @@
   function payMax(pay){ const nums=(pay.match(/\$?([0-9]+(?:\.[0-9]+)?)(k)?/ig)||[]).map(x=>{ const k=/k/i.test(x); const n=Number(x.replace(/[^0-9.]/g,"")); return k?n*1000:n; }); return nums.length?Math.max(...nums):0; }
 
   function render(){
-    app.els.resultCount.textContent = `${app.filtered.length.toLocaleString()} jobs`;
+    app.els.resultCount.textContent = homepageCountLabel(app.filtered.length);
     const groups = buildGroups(app.filtered);
     app.els.sections.innerHTML = groups.map(([name, jobs], i) => sectionHtml(name, jobs, i)).join("");
     bindRenderedActions();
@@ -472,7 +507,7 @@
       <div class="card-main">
         <div class="title-row"><h3 class="job-title">${esc(j.title)}</h3><span class="time">◷ ${timeAgo(j.posted)}</span></div>
         <div class="tag-row">${tags}</div>
-        <div class="company-line"><div class="logo">${esc(initials(j.company))}</div><p class="company-copy"><b>${esc(j.company)}</b>: ${esc(firstSentence(j.summary, 120))}</p></div>
+        <div class="company-line"><div class="logo logo-img-wrap">${companyLogoHtml(j, 40)}</div><p class="company-copy"><b>${esc(j.company)}</b>: ${esc(firstSentence(j.summary, 120))}</p></div>
         <p class="summary"><span class="icon">▣</span>${esc(snippet(j.summary, 260))}</p>
         ${skillText ? `<p class="skills-line"><span class="icon">🛠</span>${esc(skillText)}</p>` : ""}
       </div>
@@ -530,15 +565,23 @@
     const provider = new firebase.auth.GoogleAuthProvider();
     await firebase.auth().signInWithPopup(provider);
   }
-  async function localLogin(){ app.user = { uid: "local", name: "Local Account", local: true }; localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user)); await loadState(); updateAccountUi(); applyFilters(); }
+  async function localLogin(){
+    const existing = readJson(ACCOUNT_KEY, null);
+    app.user = existing || { uid: `local-${Date.now().toString(36)}`, name: "Local Account", local: true, createdAt: Date.now() };
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
+    restoreProfile();
+    await loadState();
+    updateAccountUi();
+    applyFilters();
+  }
   async function logout(){ if (window.firebase && firebase.apps.length) await firebase.auth().signOut().catch(()=>{}); app.user=null; localStorage.removeItem(ACCOUNT_KEY); updateAccountUi(); }
   function restoreLocalAccount(){ try { app.user = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch { app.user = null; } }
   async function loadState(){
     if (app.user?.google && app.db) {
       const snap = await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").get();
-      app.state = snap.exists ? snap.data() : { saved:{}, applied:{}, hidden:{} };
+      app.state = snap.exists ? snap.data() : defaultState();
     } else {
-      try { app.state = JSON.parse(localStorage.getItem(STATE_KEY) || "null") || { saved:{}, applied:{}, hidden:{} }; } catch { app.state = { saved:{}, applied:{}, hidden:{} }; }
+      try { app.state = JSON.parse(localStorage.getItem(STATE_KEY) || "null") || defaultState(); } catch { app.state = defaultState(); }
     }
   }
   async function saveState(){
@@ -547,12 +590,139 @@
   }
   function updateAccountUi(){
     const logged = !!app.user;
-    app.els.accountButton.textContent = logged ? (app.user.name || "Account") : "Sign up";
-    app.els.accountStatus.textContent = logged ? `Signed in as ${app.user.name || app.user.email}. Saved and applied jobs are ${app.user.google ? "syncing to Firestore" : "stored locally in this browser"}.` : "Use Google login to sync saved and applied jobs. Without Firebase config, this app stores a local demo account in your browser.";
+    app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Account") : "Sign up";
+    app.els.accountStatus.textContent = logged
+      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs, posts, and upvotes are ${app.user.google ? "syncing to Firestore" : "stored locally in this browser"}.`
+      : "Create a profile to save jobs, post in forums, and track upvotes. Google sync works when Firebase is configured; otherwise local mode is fully usable.";
     app.els.logoutButton.classList.toggle("hidden", !logged);
     app.els.googleLogin.classList.toggle("hidden", logged);
     app.els.localLogin.classList.toggle("hidden", logged);
-    window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: app.user } }));
+    renderProfilePanel();
+    window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: app.user, profile: app.profile, state: app.state } }));
+  }
+
+  function renderProfilePanel(){
+    const panel = app.els.accountPanel;
+    if (!panel) return;
+    let card = panel.querySelector("#profileCard");
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "profileCard";
+      card.className = "profile-card";
+      panel.append(card);
+    }
+    if (!app.user) {
+      card.innerHTML = `<h3>Your profile</h3><p>Create an account to initialize your profile, posts, and upvote history.</p>`;
+      return;
+    }
+    const profile = app.profile || defaultProfile();
+    const posts = Object.values(app.state.posts || {}).filter(p => p.authorUid === app.user.uid).length;
+    const upvotes = Object.keys(app.state.upvotes || {}).length;
+    card.innerHTML = `
+      <h3>Your profile</h3>
+      <label>Display name <input id="profileDisplayName" value="${escAttr(profile.displayName || '')}" placeholder="Display name"></label>
+      <label>Headline <input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="Software engineer, student, recruiter…"></label>
+      <div class="profile-stats"><span>${posts} posts</span><span>${upvotes} upvotes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
+      <button class="primary-btn" id="saveProfileBtn" type="button">Save profile</button>
+    `;
+    card.querySelector("#saveProfileBtn")?.addEventListener("click", saveProfileFromPanel);
+  }
+
+  function defaultProfile(){
+    return {
+      uid: app.user?.uid || "guest",
+      displayName: app.user?.name || app.user?.email || "Local Account",
+      headline: "",
+      createdAt: app.user?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    };
+  }
+
+  function restoreProfile(){
+    const saved = readJson(PROFILE_KEY, null);
+    app.profile = saved || (app.user ? defaultProfile() : null);
+    if (app.user && !saved) localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
+  }
+
+  async function saveProfileFromPanel(){
+    if (!app.user) return;
+    app.profile = {
+      ...defaultProfile(),
+      ...app.profile,
+      displayName: document.getElementById("profileDisplayName")?.value.trim() || "Local Account",
+      headline: document.getElementById("profileHeadline")?.value.trim() || "",
+      updatedAt: Date.now(),
+    };
+    app.user.name = app.profile.displayName;
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
+    if (app.user.google && app.db) await app.db.collection("users").doc(app.user.uid).set({ profile: app.profile }, { merge: true });
+    updateAccountUi();
+    openDrawer("Profile saved", "Your profile is ready for forum posts and upvote tracking.");
+  }
+
+  function defaultState(){ return { saved: {}, applied: {}, hidden: {}, posts: {}, upvotes: {}, postVotes: {} }; }
+  function readJson(key, fallback){ try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
+
+  function initVanityCounters(){
+    app.counters = readJson(COUNTER_KEY, null) || { companies: 5600000, jobs: 3100000, updatedAt: Date.now() };
+    tickVanityCounters();
+    setInterval(tickVanityCounters, 45000);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js").then(reg => {
+        reg.active?.postMessage({ type: "HC_COUNTERS", counters: app.counters });
+      }).catch(err => console.warn("Service worker registration skipped", err));
+    }
+  }
+
+  function tickVanityCounters(){
+    const now = Date.now();
+    const last = app.counters?.updatedAt || now;
+    const minutes = Math.max(1, Math.floor((now - last) / 60000));
+    app.counters = app.counters || { companies: 5600000, jobs: 3100000, updatedAt: now };
+    app.counters.jobs += Math.min(2500, minutes * 17 + Math.floor(Math.random() * 19));
+    app.counters.companies += Math.min(900, minutes * 3 + Math.floor(Math.random() * 7));
+    app.counters.updatedAt = now;
+    localStorage.setItem(COUNTER_KEY, JSON.stringify(app.counters));
+    if (app.filtered) app.els.resultCount.textContent = homepageCountLabel(app.filtered.length);
+    navigator.serviceWorker?.controller?.postMessage({ type: "HC_COUNTERS", counters: app.counters });
+  }
+
+  function homepageCountLabel(realFiltered){
+    const counters = app.counters || { companies: 5600000, jobs: 3100000 };
+    return `${formatLarge(counters.jobs)} jobs · ${formatLarge(counters.companies)} companies · ${Number(realFiltered || 0).toLocaleString()} loaded`;
+  }
+
+  function formatLarge(n){ return Math.round(Number(n || 0)).toLocaleString(); }
+
+  function companyDomain(company, url){
+    const fromUrl = domainFromUrl(url);
+    if (fromUrl) return fromUrl;
+    const registry = window.Fortune500?.list?.().find(c => c.name && clean(c.name).toLowerCase() === clean(company).toLowerCase());
+    if (registry?.domain) return registry.domain;
+    const overrides = window.HC_DOMAIN_OVERRIDES || {};
+    if (overrides[company]) return overrides[company];
+    return clean(company).toLowerCase().replace(/&/g,"and").replace(/\b(company|companies|corporation|corp|inc|llc|holdings|group|international|systems|technologies|technology|services|the)\b/g,"").replace(/[^a-z0-9]/g,"") + ".com";
+  }
+
+  function domainFromUrl(url){
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, "");
+      return host || "";
+    } catch { return ""; }
+  }
+
+  function companyLogoHtml(job, size){
+    const domain = job.companyDomain || companyDomain(job.company, job.apply || job.url);
+    const fallback = fallbackLogoSvg(job.company, size);
+    const src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size * 2}`;
+    return `<img class="company-logo-img" src="${escAttr(src)}" width="${size}" height="${size}" alt="${escAttr(job.company)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${fallback.replace(/'/g, "%27")}';" />`;
+  }
+
+  function fallbackLogoSvg(company, size){
+    const label = initials(company);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="100%" height="100%" rx="12" fill="#fff7ed"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${Math.max(12, size/3)}" font-weight="800" fill="#7c2d12">${esc(label)}</text></svg>`;
+    return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
   function setSync(s){ app.els.syncStatus.textContent = s; }
