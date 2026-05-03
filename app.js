@@ -35,12 +35,16 @@
     getUser: () => app.user,
     getProfile: () => app.profile,
     getState: () => app.state,
+    getDb: () => app.db,
+    getFirebase: () => (window.firebase && firebase.apps && firebase.apps.length ? firebase : null),
+    getAuthReady: () => app.authReady,
     isLoggedIn: () => !!app.user,
     promptLogin: (message) => {
       if (app.els.accountPanel) app.els.accountPanel.classList.remove("hidden");
       if (app.els.accountStatus && message) app.els.accountStatus.textContent = message;
       app.els.accountButton?.focus();
     },
+    saveProfile: (patch = {}) => saveProfileData(patch),
     saveForumState: async (patch = {}) => {
       app.state = { ...defaultState(), ...app.state, ...patch };
       await saveState();
@@ -145,7 +149,7 @@
 
   function routeMainView(){
     const raw = (location.hash || "").replace(/^#/, "").replace(/^!/, "");
-    const isForum = raw === "forums" || raw === "forums/" || raw.startsWith("company/") || raw === "f" || raw.startsWith("f/");
+    const isForum = raw === "forums" || raw === "forums/" || raw.startsWith("company/") || raw.startsWith("user/") || raw === "f" || raw.startsWith("f/");
     if (raw === "f" || raw === "f/") { location.replace("#forums"); return; }
     if (raw.startsWith("f/")) { location.replace("#company/" + encodeURIComponent(decodeURIComponent(raw.slice(2).split("/")[0] || ""))); return; }
     app.els.jobsMain?.classList.toggle("hidden", isForum);
@@ -164,7 +168,7 @@
       <div class="menu-stack">
         <button type="button" data-menu-action="jobs">Jobs</button>
         <button type="button" data-menu-action="forums">Company forums</button>
-        <button type="button" data-menu-action="account">${signedIn ? "Profile / account" : "Sign up / log in"}</button>
+        <button type="button" data-menu-action="account">${signedIn ? "Profile / account" : "Join / sign in"}</button>
         <button type="button" data-menu-action="ai">AI Search at mewannajob.com ↗</button>
         <button type="button" data-menu-action="filters">Jump to filters</button>
       </div>
@@ -251,8 +255,10 @@
       const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
       const configured = cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId && window.firebase;
       if (!configured) {
+        app.authReady = true;
         restoreLocalAccount();
         updateAccountUi();
+        window.dispatchEvent(new CustomEvent("hiringcafe:firebase", { detail: { db: null, user: app.user } }));
         return;
       }
       try {
@@ -264,21 +270,21 @@
           restoreProfile();
           if (app.user && app.db) {
             try {
-              const profileSnap = await app.db.collection("users").doc(app.user.uid).get();
-              if (profileSnap.exists && profileSnap.data().profile) {
-                app.profile = { ...defaultProfile(), ...profileSnap.data().profile };
-                localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
-              }
+              await loadCloudProfile();
+              await ensureUserDocument();
             } catch (e) { console.warn("Could not load profile", e); }
           }
           await loadState();
           updateAccountUi();
           applyFilters();
+          window.dispatchEvent(new CustomEvent("hiringcafe:firebase", { detail: { db: app.db, user: app.user } }));
         });
       } catch (err) {
-        console.warn("Firebase unavailable; falling back to local account", err);
+        console.warn("Firebase unavailable; falling back to local profile", err);
+        app.authReady = true;
         restoreLocalAccount();
         updateAccountUi();
+        window.dispatchEvent(new CustomEvent("hiringcafe:firebase", { detail: { db: null, user: app.user } }));
       }
     });
   }
@@ -611,7 +617,7 @@
   async function googleLogin(){
     const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
     if (!(cfg.apiKey && window.firebase && firebase.apps.length)) {
-      openDrawer("Google login not configured", "Add your Firebase config in firebase-config.js, then enable Google Authentication and Firestore. For now, use the local account to test saved listings.");
+      openDrawer("Google sign-in not configured", "Add your Firebase config in firebase-config.js, then enable Google Authentication and Firestore. For now, try a local profile to test saved listings.");
       return;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -619,7 +625,7 @@
   }
   async function localLogin(){
     const existing = readJson(ACCOUNT_KEY, null) || readJson(LEGACY_ACCOUNT_KEY, null);
-    app.user = existing || { uid: `local-${Date.now().toString(36)}`, name: "Local Account", local: true, createdAt: Date.now() };
+    app.user = existing || { uid: `local-${Date.now().toString(36)}`, name: "Local Profile", local: true, createdAt: Date.now() };
     app.user.local = true;
     if (!app.user.uid) app.user.uid = `local-${Date.now().toString(36)}`;
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
@@ -652,9 +658,9 @@
   async function loadState(){
     if (app.user?.google && app.db) {
       const snap = await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").get();
-      app.state = snap.exists ? snap.data() : defaultState();
+      app.state = { ...defaultState(), ...(snap.exists ? snap.data() : {}) };
     } else {
-      try { app.state = JSON.parse(localStorage.getItem(STATE_KEY) || "null") || defaultState(); } catch { app.state = defaultState(); }
+      try { app.state = { ...defaultState(), ...(JSON.parse(localStorage.getItem(STATE_KEY) || "null") || {}) }; } catch { app.state = defaultState(); }
     }
   }
   async function saveState(){
@@ -663,10 +669,13 @@
   }
   function updateAccountUi(){
     const logged = !!app.user;
-    if (app.els.accountButton) app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Profile") : "Sign up";
+    if (app.els.accountButton) {
+      app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Profile") : "Join";
+      app.els.accountButton.setAttribute("aria-label", logged ? "Open your profile and account panel" : "Join or sign in");
+    }
     if (app.els.accountStatus) app.els.accountStatus.textContent = logged
-      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs, posts, comments, and votes are ${app.user.google ? "syncing to Firestore" : "stored locally in this browser"}.`
-      : "Create a local profile now, or use Google after Firebase is configured. Local mode is fully usable for saved jobs, forum posts, comments, and upvotes/downvotes.";
+      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs stay private; ${app.user.google ? "forum posts, comments, votes, and profile data sync through Firestore" : "local forum activity stays in this browser"}.`
+      : "Create a profile to save jobs, post in company forums, comment, and vote. Google syncs across devices; local mode is just for this browser.";
     app.els.logoutButton?.classList.toggle("hidden", !logged);
     app.els.googleLogin?.classList.toggle("hidden", logged);
     app.els.localLogin?.classList.toggle("hidden", logged);
@@ -685,17 +694,23 @@
       panel.append(card);
     }
     if (!app.user) {
-      card.innerHTML = `<h3>Your profile</h3><p>Create an account to initialize your profile, posts, and upvote history.</p>`;
+      card.innerHTML = `<h3>Your profile</h3><p>Join or try a local profile to unlock saved jobs, posts, comments, and voting.</p>`;
       return;
     }
     const profile = app.profile || defaultProfile();
-    const posts = Object.values(app.state.posts || {}).filter(p => p.authorUid === app.user.uid).length;
-    const votes = Object.keys(app.state.upvotes || {}).filter(k => k.startsWith(`${app.user.uid}:`)).length;
+    const localPosts = Object.values(app.state.posts || {}).filter(p => p.authorUid === app.user.uid).length;
+    const localComments = Object.values(app.state.comments || {}).filter(c => c.authorUid === app.user.uid).length;
+    const localVotes = Object.keys(app.state.upvotes || {}).filter(k => k.startsWith(`${app.user.uid}:`)).length;
+    const stats = { ...defaultProfileStats(), ...(profile.stats || {}) };
+    const posts = Math.max(Number(stats.posts || 0), localPosts);
+    const comments = Math.max(Number(stats.comments || 0), localComments);
+    const votes = Math.max(Number(stats.votesCast || 0), localVotes);
     card.innerHTML = `
       <h3>Your profile</h3>
       <label>Display name <input id="profileDisplayName" value="${escAttr(profile.displayName || '')}" placeholder="Display name"></label>
-      <label>Headline <input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="Software engineer, student, recruiter…"></label>
-      <div class="profile-stats"><span>${posts} posts</span><span>${votes} votes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
+      <label>Headline <input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="Software engineer, student, recruiter..."></label>
+      <label>Bio <textarea id="profileBio" placeholder="What should people know when they see your posts?">${esc(profile.bio || "")}</textarea></label>
+      <div class="profile-stats"><span>${posts} posts</span><span>${comments} comments</span><span>${votes} votes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
       <button class="primary-btn" id="saveProfileBtn" type="button">Save profile</button>
     `;
     card.querySelector("#saveProfileBtn")?.addEventListener("click", saveProfileFromPanel);
@@ -704,11 +719,17 @@
   function defaultProfile(){
     return {
       uid: app.user?.uid || "guest",
-      displayName: app.user?.name || app.user?.email || "Local Account",
+      displayName: app.user?.name || app.user?.email || "Local Profile",
       headline: "",
+      bio: "",
+      stats: defaultProfileStats(),
       createdAt: app.user?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
+  }
+
+  function defaultProfileStats(){
+    return { posts: 0, comments: 0, votesCast: 0, karma: 0 };
   }
 
   function profileStorageKey(){
@@ -718,29 +739,80 @@
   function restoreProfile(){
     if (!app.user) { app.profile = null; return; }
     const saved = readJson(profileStorageKey(), null) || readJson(PROFILE_KEY, null);
-    app.profile = { ...defaultProfile(), ...(saved || {}) };
+    app.profile = sanitizeProfile(saved || {});
     localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
   }
 
-  async function saveProfileFromPanel(){
-    if (!app.user) return;
-    app.profile = {
-      ...defaultProfile(),
-      ...app.profile,
-      displayName: document.getElementById("profileDisplayName")?.value.trim() || "Local Account",
-      headline: document.getElementById("profileHeadline")?.value.trim() || "",
-      updatedAt: Date.now(),
+  async function loadCloudProfile(){
+    if (!(app.user?.google && app.db)) return;
+    const profileSnap = await app.db.collection("users").doc(app.user.uid).get();
+    if (!profileSnap.exists) return;
+    const data = profileSnap.data() || {};
+    app.profile = sanitizeProfile({
+      ...(data.profile || {}),
+      stats: { ...defaultProfileStats(), ...(data.profile?.stats || {}), ...(data.stats || {}) }
+    });
+    localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
+  }
+
+  async function ensureUserDocument(){
+    if (!(app.user?.google && app.db)) return;
+    const profile = sanitizeProfile(app.profile || {});
+    app.profile = profile;
+    await app.db.collection("users").doc(app.user.uid).set({
+      uid: app.user.uid,
+      profile,
+      stats: profile.stats || defaultProfileStats(),
+      updatedAt: Date.now()
+    }, { merge: true });
+  }
+
+  function sanitizeProfile(profile){
+    const base = { ...defaultProfile(), ...(profile || {}) };
+    const displayName = String(base.displayName || app.user?.name || app.user?.email || "Community Member").trim().slice(0, 80);
+    const headline = String(base.headline || "").trim().slice(0, 120);
+    const bio = String(base.bio || "").trim().slice(0, 500);
+    return {
+      ...base,
+      uid: app.user?.uid || base.uid || "guest",
+      displayName: displayName || "Community Member",
+      headline,
+      bio,
+      stats: { ...defaultProfileStats(), ...(base.stats || {}) },
+      updatedAt: base.updatedAt || Date.now()
     };
+  }
+
+  async function saveProfileData(patch = {}){
+    if (!app.user) return null;
+    app.profile = sanitizeProfile({ ...app.profile, ...patch, updatedAt: Date.now() });
     app.user.name = app.profile.displayName;
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
     localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
     localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
-    if (app.user.google && app.db) await app.db.collection("users").doc(app.user.uid).set({ profile: app.profile }, { merge: true });
+    if (app.user.google && app.db) {
+      const { stats, ...profileForCloud } = app.profile;
+      await app.db.collection("users").doc(app.user.uid).set({
+        uid: app.user.uid,
+        profile: profileForCloud,
+        updatedAt: Date.now()
+      }, { merge: true });
+    }
+    return app.profile;
+  }
+
+  async function saveProfileFromPanel(){
+    if (!app.user) return;
+    await saveProfileData({
+      displayName: document.getElementById("profileDisplayName")?.value.trim() || "Local Profile",
+      headline: document.getElementById("profileHeadline")?.value.trim() || "",
+      bio: document.getElementById("profileBio")?.value.trim() || "",
+    });
     updateAccountUi();
     openDrawer("Profile saved", "Your profile is ready for forum posts and upvote tracking.");
   }
 
-  function defaultState(){ return { saved: {}, applied: {}, hidden: {}, posts: {}, upvotes: {}, postVotes: {} }; }
+  function defaultState(){ return { saved: {}, applied: {}, hidden: {}, posts: {}, comments: {}, upvotes: {}, postVotes: {} }; }
   function readJson(key, fallback){ try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 
   function initVanityCounters(){

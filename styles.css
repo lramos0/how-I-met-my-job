@@ -1145,10 +1145,240 @@ main {
 }
 .profile-card h3 { margin: 0 0 10px; font-size: 16px; }
 .profile-card label { display: grid; gap: 6px; margin: 8px 0; font-weight: 700; color: var(--jp-ink-secondary); }
-.profile-card input { width: 100%; border: 1px solid var(--jp-border); border-radius: 10px; padding: 10px 12px; font: inherit; background: #fff; }
+.profile-card input,
+.profile-card textarea { width: 100%; border: 1px solid var(--jp-border); border-radius: 10px; padding: 10px 12px; font: inherit; background: #fff; }
+.profile-card textarea { min-height: 86px; resize: vertical; line-height: 1.45; }
 .profile-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .profile-stats span { border: 1px solid var(--jp-border); background: var(--jp-surface); border-radius: 999px; padding: 6px 10px; font-weight: 800; font-size: 12px; color: var(--jp-ink-secondary); }
 .menu-stack { display: grid; gap: 8px; }
 .menu-stack button { text-align: left; border: 1px solid var(--jp-border); border-radius: 12px; background: var(--jp-surface); padding: 10px 12px; font: inherit; font-weight: 800; cursor: pointer; }
 .menu-stack button:hover { background: var(--jp-surface-shell); }
 @media (max-width: 760px) { .account-panel { flex-direction: column; } }
+
+/* Mobile usability pass: compact header, clear account flow, touch-first job cards */
+@media (max-width: 760px) {
+  :root {
+    --page-inline-pad: 12px;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  .top-shell {
+    position: sticky;
+  }
+
+  .masthead {
+    padding: 9px 12px 7px;
+  }
+
+  .brand-lockup {
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  .brand-logo {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .masthead-eyebrow {
+    display: none;
+  }
+
+  .masthead-title {
+    margin: 0;
+    font-size: 1.25rem;
+    letter-spacing: -0.03em;
+  }
+
+  .masthead-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 7px;
+  }
+
+  .masthead-tab {
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .masthead-meta {
+    display: none;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 12px 10px;
+  }
+
+  .search-box {
+    height: 44px;
+    padding: 0 13px;
+  }
+
+  .search-box input {
+    font-size: 15px;
+  }
+
+  .yellow-btn.account-cta,
+  .menu-btn {
+    min-width: 44px;
+    height: 42px;
+    padding-inline: 14px;
+  }
+
+  .filters {
+    padding: 8px 12px 10px;
+    gap: 8px;
+  }
+
+  .filters button {
+    min-height: 36px;
+  }
+
+  main {
+    padding-top: 16px;
+    padding-bottom: 36px;
+  }
+
+  .account-panel {
+    margin-bottom: 16px;
+    padding: 14px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .account-panel h2 {
+    font-size: 18px;
+  }
+
+  .account-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .account-actions button,
+  .profile-card .primary-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .profile-card {
+    border-radius: 18px;
+    padding: 13px;
+  }
+
+  .profile-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-stats span {
+    text-align: center;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .toolbar div:first-child,
+  .toolbar label {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar label {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .toolbar select,
+  .toolbar button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .sections {
+    gap: 32px;
+  }
+
+  .section-head h2 {
+    font-size: 17px;
+    white-space: normal;
+  }
+
+  .job-card {
+    height: auto;
+    min-height: 0;
+    width: min(330px, calc(100vw - 2 * var(--page-inline-pad)));
+  }
+
+  .hover-actions {
+    position: static;
+    display: grid;
+    gap: 8px;
+    grid-template-rows: none;
+    opacity: 1;
+    pointer-events: auto;
+    background: #fff;
+    border-bottom: 1px solid var(--jp-border);
+  }
+
+  .hover-actions > div:nth-child(2) {
+    display: none;
+  }
+
+  .hover-top,
+  .hover-bottom,
+  .icon-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .save,
+  .mark,
+  .apply,
+  .round,
+  .icon-actions button {
+    min-height: 42px;
+  }
+
+  .save {
+    flex: 1 1 110px;
+  }
+
+  .mark,
+  .apply {
+    flex: 1 1 130px;
+  }
+
+  .card-main {
+    padding-top: 12px;
+  }
+
+  .drawer {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+    max-height: min(70vh, 560px);
+    overflow: auto;
+    border-radius: 18px;
+  }
+}
