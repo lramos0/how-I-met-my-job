@@ -2,7 +2,7 @@
   const DATA_PATHS = ["data/jobs_restored.csv", "./data/jobs_restored.csv", "/data/jobs_restored.csv"];
   /** Canonical Job Data Pool HTTP API (see https://jobdatapool.com/) — max 500 listings per request; we merge batches up to LISTINGS_MAX. */
   const API_JOBS = "https://api.jobdatapool.com/v1/jobs";
-  const LISTINGS_MAX = Math.min(1000, Number(window.JDP_LISTINGS_MAX) || 1000);
+  const LISTINGS_MAX = Math.min(10000, Number(window.JDP_LISTINGS_MAX) || 10000);
   const CACHE_KEY = "jdp_sample_jobs_v1";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
   const ACCOUNT_KEY = "hc_account_v1";
