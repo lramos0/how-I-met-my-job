@@ -1,6 +1,0 @@
-pandas
-mlflow
-numpy
-supabase
-requests
-pyspark
