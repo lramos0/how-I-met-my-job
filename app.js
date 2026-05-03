@@ -17,6 +17,16 @@
     headerKeywordBoost: null,
   };
 
+  window.HiringCafeAuth = {
+    getUser: () => app.user,
+    isLoggedIn: () => !!app.user,
+    promptLogin: (message) => {
+      if (app.els.accountPanel) app.els.accountPanel.classList.remove("hidden");
+      if (app.els.accountStatus && message) app.els.accountStatus.textContent = message;
+      app.els.accountButton?.focus();
+    }
+  };
+
   document.addEventListener("DOMContentLoaded", init);
 
   async function init(){
@@ -162,18 +172,42 @@
 
   function initFirebaseWhenReady(){
     window.addEventListener("load", async () => {
-      const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
-      const configured = cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId && window.firebase;
+      const cfg =
+        window.HIRING_CAFE_FIREBASE_CONFIG ||
+        window.HIRINGCAFE_FIREBASE_CONFIG ||
+        {};
+
+      const configured =
+        cfg.apiKey &&
+        cfg.authDomain &&
+        cfg.projectId &&
+        cfg.appId &&
+        window.firebase;
+
       if (!configured) {
         restoreLocalAccount();
+        app.authReady = true;
         updateAccountUi();
         return;
       }
+
       try {
-        firebase.initializeApp(cfg);
+        if (!firebase.apps.length) {
+          firebase.initializeApp(cfg);
+        }
+
         app.db = firebase.firestore();
+
         firebase.auth().onAuthStateChanged(async user => {
-          app.user = user ? { uid: user.uid, name: user.displayName || user.email, email: user.email, google: true } : null;
+          app.user = user
+            ? {
+                uid: user.uid,
+                name: user.displayName || user.email,
+                email: user.email,
+                google: true
+              }
+            : null;
+
           app.authReady = true;
           await loadState();
           updateAccountUi();
@@ -182,6 +216,7 @@
       } catch (err) {
         console.warn("Firebase unavailable; falling back to local account", err);
         restoreLocalAccount();
+        app.authReady = true;
         updateAccountUi();
       }
     });
@@ -512,11 +547,16 @@
   }
 
   async function googleLogin(){
-    const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
+    const cfg =
+      window.HIRING_CAFE_FIREBASE_CONFIG ||
+      window.HIRINGCAFE_FIREBASE_CONFIG ||
+      {};
+
     if (!(cfg.apiKey && window.firebase && firebase.apps.length)) {
       openDrawer("Google login not configured", "Add your Firebase config in firebase-config.js, then enable Google Authentication and Firestore. For now, use the local account to test saved listings.");
       return;
     }
+
     const provider = new firebase.auth.GoogleAuthProvider();
     await firebase.auth().signInWithPopup(provider);
   }
@@ -542,6 +582,7 @@
     app.els.logoutButton.classList.toggle("hidden", !logged);
     app.els.googleLogin.classList.toggle("hidden", logged);
     app.els.localLogin.classList.toggle("hidden", logged);
+    window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: app.user } }));
   }
 
   function setSync(s){ app.els.syncStatus.textContent = s; }

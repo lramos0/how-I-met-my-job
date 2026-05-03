@@ -205,7 +205,7 @@ body {
 
 .topbar {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) minmax(0, min(380px, 42vw)) auto auto auto minmax(36px, 42px);
+  grid-template-columns: minmax(360px, 1fr) auto auto auto minmax(36px, 42px);
   gap: 10px;
   align-items: center;
   padding: 12px clamp(12px, 3vw, 20px);
@@ -219,8 +219,6 @@ body {
   min-width: 0;
 }
 
-.topbar .brand-dot,
-.topbar .mode-pill,
 .topbar .green-btn,
 .topbar .yellow-btn,
 .topbar .ai-btn,
@@ -288,7 +286,7 @@ body {
 /* Search + location — consistent inputs */
 .search-box,
 .location-box {
-  height: 44px;
+  height: 50px;
   border: 1px solid var(--jp-border);
   background: var(--jp-surface);
   border-radius: var(--jp-radius-pill);
@@ -317,7 +315,7 @@ body {
   outline: 0;
   background: transparent;
   width: 100%;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--jp-ink);
 }
 
@@ -1072,7 +1070,7 @@ main {
   }
 
   .topbar {
-    grid-template-columns: 40px 1fr 44px;
+    grid-template-columns: 1fr auto auto;
     gap: 8px;
   }
 
@@ -1084,7 +1082,7 @@ main {
   }
 
   .search-box {
-    grid-column: 2;
+    grid-column: 1 / -1;
   }
 
   .filters {
@@ -1112,5 +1110,25 @@ main {
 
   .job-card {
     height: 420px;
+  }
+}
+
+
+/* Header declutter: search is now the hero control. */
+.topbar .search-box {
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.topbar .search-box:focus-within {
+  border-color: var(--jp-teal);
+  box-shadow: 0 0 0 4px var(--jp-teal-soft);
+}
+.topbar .search-icon {
+  font-size: 18px;
+}
+@media (max-width: 900px) {
+  .topbar .yellow-btn,
+  .topbar .menu-btn {
+    justify-self: end;
   }
 }

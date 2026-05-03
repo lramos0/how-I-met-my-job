@@ -1,5 +1,5 @@
 /**
- * Company forums — hash routes #f (hub) and #f/:slug (Reddit-style threads, localStorage).
+ * Company forums — hash routes #forums (hub) and #company/:slug (community threads, localStorage).
  */
 (function () {
   var STORAGE_KEY = "himmj_forum_v1";
@@ -33,16 +33,47 @@
   }
 
   function getDisplayName() {
+    var user = getLoggedInUser();
+    if (user && (user.name || user.email)) return user.name || user.email;
     try {
       var n = localStorage.getItem(USER_KEY);
       if (n) return n;
       var animals = ["RedPanda", "Capybara", "Quokka", "Manatee", "Axolotl", "Dolphin", "Fennec", "Lynx"];
-      n = "u/" + animals[Math.floor(Math.random() * animals.length)] + Math.floor(Math.random() * 900 + 100);
+      n = "Community Member " + Math.floor(Math.random() * 900 + 100);
       localStorage.setItem(USER_KEY, n);
       return n;
     } catch (e) {
-      return "u/guest";
+      return "Community Member";
     }
+  }
+
+  function getLoggedInUser() {
+    if (window.HiringCafeAuth && window.HiringCafeAuth.getUser) return window.HiringCafeAuth.getUser();
+    try { return JSON.parse(localStorage.getItem("hc_account_v1") || "null"); } catch (e) { return null; }
+  }
+
+  function isLoggedIn() {
+    if (window.HiringCafeAuth && window.HiringCafeAuth.isLoggedIn) return window.HiringCafeAuth.isLoggedIn();
+    return !!getLoggedInUser();
+  }
+
+  function promptLogin(action) {
+    var msg = "Please sign in before you " + action + ". You can use Google login or the local demo account while developing.";
+    if (window.HiringCafeAuth && window.HiringCafeAuth.promptLogin) {
+      window.HiringCafeAuth.promptLogin(msg);
+    } else {
+      var panel = document.getElementById("accountPanel");
+      var status = document.getElementById("accountStatus");
+      if (panel) panel.classList.remove("hidden");
+      if (status) status.textContent = msg;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function requireLogin(action) {
+    if (isLoggedIn()) return true;
+    promptLogin(action);
+    return false;
   }
 
   function loadStore() {
@@ -74,10 +105,16 @@
 
   function parseRoute() {
     var raw = (location.hash || "").replace(/^#/, "").replace(/^!/, "");
-    if (raw === "f" || raw === "f/") return { type: "forum-hub" };
-    if (raw.indexOf("f/") === 0) {
-      var slug = raw.slice(2).split("/")[0];
+    if (raw === "forums" || raw === "forums/") return { type: "forum-hub" };
+    if (raw.indexOf("company/") === 0) {
+      var slug = raw.slice(8).split("/")[0];
       if (slug) return { type: "forum-company", slug: decodeURIComponent(slug) };
+    }
+    // Backward-compatible redirects from the old route.
+    if (raw === "f" || raw === "f/") { location.replace("#forums"); return { type: "forum-hub" }; }
+    if (raw.indexOf("f/") === 0) {
+      var oldSlug = raw.slice(2).split("/")[0];
+      if (oldSlug) { location.replace("#company/" + encodeURIComponent(decodeURIComponent(oldSlug))); return { type: "forum-company", slug: decodeURIComponent(oldSlug) }; }
     }
     return { type: "jobs" };
   }
@@ -99,7 +136,7 @@
     var isForum = route.type === "forum-hub" || route.type === "forum-company";
     if (filters) filters.style.display = isForum ? "none" : "";
     if (hire) hire.style.display = isForum ? "none" : "";
-    if (topSearch) topSearch.style.display = isForum ? "none" : "";
+    if (topSearch) topSearch.style.display = "";
     if (toolbar) toolbar.style.display = isForum ? "none" : "";
   }
 
@@ -322,6 +359,83 @@
     return copy;
   }
 
+
+  function hashNum(str) {
+    var h = 2166136261;
+    str = String(str || "");
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    }
+    return Math.abs(h >>> 0);
+  }
+
+  function fmtNum(n) {
+    if (n == null || n === "") return "—";
+    return Number(n).toLocaleString();
+  }
+
+  function demoOutcomes(company) {
+    var industries = ["Technology", "Healthcare", "Financial Services", "Retail", "Consulting", "Energy", "Manufacturing", "Education", "Government", "Startups"];
+    var locations = ["New York, NY", "San Francisco, CA", "Austin, TX", "Chicago, IL", "Seattle, WA", "Remote", "Boston, MA", "Atlanta, GA", "Dallas, TX", "Los Angeles, CA"];
+    var roles = ["Software Engineer", "Product Manager", "Data Analyst", "Business Analyst", "Operations", "Sales", "Finance", "UX Designer", "Security Engineer", "Marketing"];
+    var skills = ["SQL · Excel · Tableau", "Python · APIs · Cloud", "React · TypeScript · CSS", "Stakeholder mgmt · Roadmaps", "Java · Spring · AWS", "Power BI · Forecasting", "Kubernetes · Terraform", "Figma · Research", "Go · Distributed systems", "Salesforce · CRM"];
+    var out = [];
+    var seed = hashNum(company.slug || company.name);
+    for (var i = 0; i < 8; i++) {
+      out.push({
+        sourceIndustry: industries[(seed + i * 3) % industries.length],
+        location: locations[(seed + i * 5) % locations.length],
+        role: roles[(seed + i * 7) % roles.length],
+        skills: skills[(seed + i * 11) % skills.length],
+        yoe: 1 + ((seed + i * 2) % 12),
+        outcome: i % 4 === 0 ? "Offer" : i % 3 === 0 ? "Final round" : "Interview",
+        timing: (7 + ((seed + i * 13) % 35)) + " days"
+      });
+    }
+    return out;
+  }
+
+  function localOutcomeRows(company) {
+    try {
+      var all = JSON.parse(localStorage.getItem("himmj_outcomes_v1") || "[]");
+      return all.filter(function (x) {
+        return x.companySlug === company.slug || x.companyName === company.name;
+      }).map(function (x) {
+        return {
+          sourceIndustry: x.sourceIndustry || "Submitted outcome",
+          location: x.location || "—",
+          role: x.role || "—",
+          skills: x.skills || "—",
+          yoe: x.yearsExperience || "—",
+          outcome: x.outcome || "Saved",
+          timing: x.dateApplied || "—"
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function renderOutcomePanel(company) {
+    var rows = localOutcomeRows(company).concat(demoOutcomes(company));
+    var counts = {};
+    rows.forEach(function (r) {
+      counts[r.sourceIndustry] = (counts[r.sourceIndustry] || 0) + 1;
+    });
+    var chips = Object.keys(counts).sort(function (a,b) { return counts[b] - counts[a]; }).map(function (name) {
+      return '<span class="reddit-stat-chip"><strong>' + esc(counts[name]) + '</strong> ' + esc(name) + '</span>';
+    }).join("");
+    var body = rows.slice(0, 10).map(function (r) {
+      return '<tr><td>' + esc(r.sourceIndustry) + '</td><td>' + esc(r.role) + '</td><td>' + esc(r.location) + '</td><td>' + esc(r.skills) + '</td><td>' + esc(r.yoe) + '</td><td><span class="reddit-outcome-pill">' + esc(r.outcome) + '</span></td><td>' + esc(r.timing) + '</td></tr>';
+    }).join("");
+    return '<section class="reddit-outcomes">' +
+      '<div class="reddit-outcomes-head"><div><h3>Hiring outcomes & metadata</h3><p>GradCafe-style rows for this company: source industry, role, location, skills, experience, outcome, and timing. Demo rows are deterministic placeholders until real submissions arrive.</p></div><button type="button" class="reddit-btn-primary" data-open-outcome-survey>Share outcome</button></div>' +
+      '<div class="reddit-stat-chips">' + chips + '</div>' +
+      '<div class="reddit-outcome-table-wrap"><table class="reddit-outcome-table"><thead><tr><th>Hired from</th><th>Role track</th><th>Location</th><th>Skills</th><th>YOE</th><th>Outcome</th><th>Timing</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '</section>';
+  }
+
   function renderCompanyPage(slug) {
     var root = $("forumRoot");
     if (!root) return;
@@ -339,16 +453,14 @@
       '<div class="reddit-sub-bar">' +
       avatarSlot +
       '<div class="reddit-sub-info">' +
-      "<h2><a href=\"#f/" +
+      "<h2><a href=\"#company/" +
       esc(fslug) +
-      '">f/' +
-      esc(display.replace(/\s+/g, "")) +
+      '">' +
+      esc(display) +
       "</a></h2>" +
-      '<p class="reddit-sub-meta"><strong>f/' +
-      esc(fslug) +
-      "</strong> · Fortune " +
+      '<p class="reddit-sub-meta"><strong>Company forum</strong> · Fortune ' +
       (company ? "#" + company.rank : "?") +
-      " · a cozy corner to swap interview stories 🌸</p>" +
+      " · " + esc(company ? company.industry : "Company") + " · " + esc(company && company.headquarters ? company.headquarters : "community hiring data") + "</p>" +
       "</div></div></div>";
 
     var sortBar =
@@ -364,14 +476,20 @@
       '">⬆️ Top</button>' +
       "</div>";
 
-    var create =
-      '<div class="reddit-create">' +
-      "<h3>Start a thread</h3>" +
-      '<input type="text" id="forumNewTitle" placeholder="Title" maxlength="300" />' +
-      '<textarea id="forumNewBody" placeholder="Text (optional) — how did it go?"></textarea>' +
-      '<div class="reddit-create-actions">' +
-      '<button type="button" class="reddit-btn-primary" id="forumSubmitPost">Post</button>' +
-      "</div></div>";
+    var loggedIn = isLoggedIn();
+    var create = loggedIn
+      ? '<div class="reddit-create">' +
+        "<h3>Start a thread</h3>" +
+        '<input type="text" id="forumNewTitle" placeholder="Title" maxlength="300" />' +
+        '<textarea id="forumNewBody" placeholder="Text (optional) — how did it go?"></textarea>' +
+        '<div class="reddit-create-actions">' +
+        '<button type="button" class="reddit-btn-primary" id="forumSubmitPost">Post</button>' +
+        "</div></div>"
+      : '<div class="reddit-create reddit-login-gate">' +
+        "<h3>Sign in to start a thread</h3>" +
+        "<p>Reading is open, but posting requires an account so company pages stay useful and accountable.</p>" +
+        '<button type="button" class="reddit-btn-primary rd-login-required" data-action="post">Sign in to post</button>' +
+        "</div>";
 
     var posts = sortPosts(data.posts, sortMode);
     var postsHtml = posts
@@ -421,12 +539,15 @@
           "</div>" +
           '<div class="reddit-comments">' +
           '<div class="reddit-comment-form">' +
-          '<textarea class="rd-top-comment" placeholder="What are your thoughts? Join the conversation 💬"></textarea>' +
-          '<div class="reddit-create-actions">' +
-          '<button type="button" class="reddit-btn-primary rd-add-top-comment" data-post="' +
-          esc(p.id) +
-          '">Comment</button>' +
-          "</div></div>" +
+          (loggedIn
+            ? '<textarea class="rd-top-comment" placeholder="What are your thoughts? Join the conversation 💬"></textarea>' +
+              '<div class="reddit-create-actions">' +
+              '<button type="button" class="reddit-btn-primary rd-add-top-comment" data-post="' +
+              esc(p.id) +
+              '">Comment</button>' +
+              "</div>"
+            : '<div class="reddit-login-inline">Sign in to comment on this thread. <button type="button" class="reddit-btn-ghost rd-login-required" data-action="comment">Sign in</button></div>') +
+          "</div>" +
           '<div class="reddit-comment-thread">' +
           commentsHtml +
           "</div></div></div></article>"
@@ -439,21 +560,22 @@
     var sidebar =
       '<aside class="reddit-sidebar">' +
       "<h4>About this forum</h4>" +
-      "<p>Posts stay on <strong>your device</strong> in this demo. Same vibe as Reddit threads: vote, reply, nest comments.</p>" +
-      "<p>You're posting as <strong>" +
-      esc(getDisplayName()) +
-      "</strong>.</p>" +
+      "<p>Every company has its own page, logo slot, discussion feed, and hiring-outcome metadata panel.</p>" +
+      "<p><strong>Company metadata</strong><br>Industry: " + esc(company ? company.industry : "—") + "<br>Revenue: $" + fmtNum(company && company.revenueMillions) + "M<br>Employees: " + fmtNum(company && company.employees) + "<br>HQ: " + esc(company && company.headquarters ? company.headquarters : "—") + "</p>" +
+      "<p>Posts stay on <strong>your device</strong> in this demo. Community-style threads: vote, reply, and nest comments.</p>" +
+      "<p>" + (isLoggedIn() ? "Signed in as <strong>" + esc(getDisplayName()) + "</strong>." : "Sign in to post or comment.") + "</p>" +
       "<ul><li>Be kind</li><li>No doxxing</li><li>Share signal, not spam</li></ul>" +
       "</aside>";
 
     root.innerHTML =
       '<div class="reddit-top">' +
-      '<a href="#f" class="reddit-back">← All forums</a>' +
+      '<a href="#forums" class="reddit-back">← All forums</a>' +
       '<a href="#" class="reddit-back">Job listings</a>' +
       "</div>" +
       banner +
       '<div class="reddit-layout">' +
       "<div>" +
+      renderOutcomePanel(company || { name: display, slug: fslug, industry: "Fortune 500" }) +
       create +
       sortBar +
       '<div class="reddit-feed">' +
@@ -466,11 +588,18 @@
     if (av && company) mountForumIcon(av, company, 64);
 
     $("forumSubmitPost")?.addEventListener("click", function () {
+      if (!requireLogin("post")) return;
       var t = $("forumNewTitle");
       var b = $("forumNewBody");
       addPost(fslug, t && t.value, b && b.value);
       if (t) t.value = "";
       if (b) b.value = "";
+    });
+
+    root.querySelectorAll(".rd-login-required").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        promptLogin(btn.getAttribute("data-action") || "post");
+      });
     });
 
     root.querySelectorAll("[data-sort]").forEach(function (btn) {
@@ -502,6 +631,7 @@
     });
     root.querySelectorAll(".rd-add-top-comment").forEach(function (btn) {
       btn.addEventListener("click", function () {
+        if (!requireLogin("comment")) return;
         var postId = btn.getAttribute("data-post");
         var ta = btn.closest(".reddit-comments").querySelector(".rd-top-comment");
         addComment(fslug, postId, ta && ta.value, null);
@@ -517,6 +647,7 @@
     });
     root.querySelectorAll(".rd-send-reply").forEach(function (btn) {
       btn.addEventListener("click", function () {
+        if (!requireLogin("reply")) return;
         var parent = btn.getAttribute("data-parent");
         var box = btn.closest(".rd-reply-box");
         var ta = box && box.querySelector("textarea");
@@ -540,19 +671,19 @@
   function renderHub() {
     var root = $("forumRoot");
     if (!root) return;
-    var list = window.Fortune500.list().slice(0, 60);
+    var list = window.Fortune500.list();
     var cards = list
       .map(function (c) {
         return (
-          '<a class="reddit-hub-card" href="#f/' +
+          '<a class="reddit-hub-card" href="#company/' +
           encodeURIComponent(c.slug) +
           '">' +
           '<span class="forum-icon-slot fc-mini" data-slug="' +
           esc(c.slug) +
           '"></span>' +
-          "<span>f/" +
-          esc(c.name.replace(/\s+/g, "")) +
-          "</span>" +
+          "<span><strong>" +
+          esc(c.name) +
+          "</strong><small>" + esc(c.industry || "Fortune 500") + "</small></span>" +
           '<span class="fc-rank">#' +
           c.rank +
           "</span></a>"
@@ -565,7 +696,7 @@
       '<a href="#" class="reddit-back">← Job listings</a>' +
       '<div class="reddit-hub-title">' +
       "<h1>Company forums</h1>" +
-      "<p>Pick a Fortune 500 — each has its own f/ page. Cute Reddit vibes, local only.</p>" +
+      "<p>Pick a Fortune 500 — all 500 get a logo, metadata page, and community discussion board.</p>" +
       "</div>" +
       '<div class="forum-co-search-wrap">' +
       '<span class="forum-co-search-icon">⌕</span>' +
@@ -605,7 +736,7 @@
         b.appendChild(lab);
         b.appendChild(rk);
         b.addEventListener("click", function () {
-          location.hash = "f/" + encodeURIComponent(c.slug);
+          location.hash = "company/" + encodeURIComponent(c.slug);
         });
         li.appendChild(b);
         res.appendChild(li);
@@ -637,8 +768,30 @@
     else if (r.type === "forum-company") renderCompanyPage(r.slug);
   }
 
+
+  function bindGlobalCompanySearch() {
+    var input = document.getElementById("searchInput");
+    if (!input || input.__hcCompanySearchBound) return;
+    input.__hcCompanySearchBound = true;
+    input.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      var q = input.value.trim();
+      if (!q || !window.Fortune500) return;
+      var hit = window.Fortune500.searchCompanies(q, 1)[0];
+      if (hit) {
+        e.preventDefault();
+        location.hash = "company/" + encodeURIComponent(hit.slug);
+      }
+    });
+  }
+
   function init() {
     window.addEventListener("hashchange", route);
+    window.addEventListener("hiringcafe:authchange", function () {
+      var r = parseRoute();
+      if (r.type === "forum-company") route();
+    });
+    bindGlobalCompanySearch();
     if (window.Fortune500) {
       window.Fortune500.ready().then(route).catch(route);
     } else {
