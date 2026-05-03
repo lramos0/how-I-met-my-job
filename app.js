@@ -1,13 +1,20 @@
 (() => {
   const DATA_PATHS = ["data/jobs_restored.csv", "./data/jobs_restored.csv", "/data/jobs_restored.csv"];
-  /** Canonical Job Data Pool HTTP API (see https://jobdatapool.com/) — currently requested in 500-listing pages. */
-  const API_JOBS = window.JDP_API_JOBS || "https://api.jobdatapool.com/v1/jobs";
+  /**
+   * Browser fetches must use a same-origin proxy. Direct calls to
+   * https://api.jobdatapool.com/v1/jobs are blocked by CORS in production.
+   * Deploy api/jobs.js (included in this patch) or point JDP_API_JOBS at your own backend.
+   */
+  const API_JOBS = window.JDP_API_JOBS || "/api/jobs";
+  const DIRECT_API_JOBS = window.JDP_DIRECT_API_JOBS || "";
   const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);
   const REMOTE_BATCH_SIZE = Math.min(500, Number(window.JDP_REMOTE_BATCH_SIZE) || 500);
   const REMOTE_BATCHES = Math.min(4, Number(window.JDP_REMOTE_BATCHES) || 4);
   const LISTINGS_MAX = Math.min(6000, Number(window.JDP_LISTINGS_MAX) || (LOCAL_LISTINGS_MAX + (REMOTE_BATCH_SIZE * REMOTE_BATCHES)));
-  const CACHE_KEY = "jdp_merged_jobs_v2";
+  const CACHE_KEY = "jdp_merged_jobs_v3";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
+  const ENABLE_JOB_CACHE = window.JDP_ENABLE_JOB_CACHE === true;
+  const JOB_CACHE_MAX_BYTES = Number(window.JDP_CACHE_MAX_BYTES) || 900_000;
   const ACCOUNT_KEY = "hc_account_v2";
   const STATE_KEY = "hc_job_state_v2";
   const PROFILE_KEY = "hc_profile_v1";
@@ -215,6 +222,7 @@
   }
 
   function readJobsCache(){
+    if (!ENABLE_JOB_CACHE) return null;
     try {
       const raw = sessionStorage.getItem(CACHE_KEY);
       if (!raw) return null;
@@ -229,8 +237,11 @@
   }
 
   function writeJobsCache(jobs){
+    if (!ENABLE_JOB_CACHE || !Array.isArray(jobs) || !jobs.length) return;
     try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), jobs }));
+      const payload = JSON.stringify({ t: Date.now(), jobs });
+      if (payload.length > JOB_CACHE_MAX_BYTES) return;
+      sessionStorage.setItem(CACHE_KEY, payload);
     } catch (err) {
       console.warn("Could not cache listings", err);
     }
@@ -293,13 +304,15 @@
   }
 
   /**
-   * Fetches exactly the requested four 500-listing pages when the API is reachable, then dedupes.
-   * Offset/page params are included so proxies or future API versions can return distinct pages.
+   * Fetches exactly the requested four 500-listing pages from a same-origin proxy.
+   * Browsers cannot read Job Data Pool directly unless their API sends CORS headers.
    */
   async function fetchSampleListingsFromApi(){
     const headers = { Accept: "application/json" };
     const batches = [];
     const failures = [];
+    const endpoints = [API_JOBS];
+    if (DIRECT_API_JOBS) endpoints.push(DIRECT_API_JOBS);
 
     for (let batch = 0; batch < REMOTE_BATCHES; batch++) {
       const offset = batch * REMOTE_BATCH_SIZE;
@@ -309,24 +322,23 @@
         page: String(batch + 1),
         country_code: "US"
       });
-      try {
-        const res = await fetch(`${API_JOBS}?${params}`, { headers, cache: "no-store" });
-        if (!res.ok) throw new Error(`GET batch ${batch + 1} returned ${res.status}`);
-        batches.push(...extractJobsPayload(await res.json()));
-        continue;
-      } catch (getErr) {
+
+      let loadedThisBatch = false;
+      for (const endpoint of endpoints) {
         try {
-          const res = await fetch(API_JOBS, {
-            method: "POST",
-            headers: { ...headers, "Content-Type": "application/json" },
-            body: JSON.stringify({ limit: REMOTE_BATCH_SIZE, offset, page: batch + 1, country_code: "US" }),
-          });
-          if (!res.ok) throw new Error(`POST batch ${batch + 1} returned ${res.status}`);
-          batches.push(...extractJobsPayload(await res.json()));
-        } catch (postErr) {
-          failures.push(postErr.message || getErr.message || String(postErr || getErr));
+          const res = await fetch(`${endpoint}?${params}`, { headers, cache: "no-store", credentials: "same-origin" });
+          if (!res.ok) throw new Error(`GET ${endpoint} batch ${batch + 1} returned ${res.status}`);
+          const rows = extractJobsPayload(await res.json());
+          if (!rows.length) throw new Error(`GET ${endpoint} batch ${batch + 1} returned no jobs`);
+          batches.push(...rows);
+          loadedThisBatch = true;
+          break;
+        } catch (err) {
+          failures.push(err.message || String(err));
         }
       }
+
+      if (!loadedThisBatch) break;
     }
 
     if (!batches.length && failures.length) throw new Error(failures[0]);
