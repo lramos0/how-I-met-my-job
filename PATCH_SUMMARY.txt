@@ -1,24 +1,29 @@
-HiringCafe patch summary
+HiringCafe patch v3
 
-Changed files:
-- app.js
-- lib/fortune500.js
-- forum.js
-- service-worker.js
-- api/jobs.js
+Fixes in this bundle:
+1. Restored navigation for Company forums.
+   - #forums now hides the jobs page and shows #forumView.
+   - Jobs tab switches back to the jobs page.
+   - Active tab state is updated.
+   - Old #f links still redirect to #forums.
 
-What changed:
-1. Job loading merges the first 4,000 bundled/local jobs with 4 remote Job Data Pool batches of 500 each, targeting 6,000 total loaded listings after dedupe.
-2. app.js now calls /api/jobs by default instead of https://api.jobdatapool.com/v1/jobs directly. Direct browser calls were blocked by CORS, so the included api/jobs.js same-origin proxy must be deployed on the same domain.
-3. Added api/jobs.js, a Vercel-style serverless proxy. It forwards limit, offset, page, and country_code to Job Data Pool from the server side.
-4. Removed the GET/POST browser fallback to the remote API. It caused repeated CORS errors in the console and cannot succeed unless the upstream API sends browser CORS headers.
-5. Disabled large merged-job sessionStorage caching by default. The bundled 4k + remote 2k records can exceed browser quota; caching can be re-enabled with window.JDP_ENABLE_JOB_CACHE = true and a small enough JDP_CACHE_MAX_BYTES.
-6. Company logos no longer use Clearbit. Job cards and Fortune helpers use domain/favicon logos with inline SVG initials fallback.
-7. Homepage count display shows a cosmetic network-style counter starting around 3,100,000 jobs and 5,600,000 companies, while still including the real loaded filtered count.
-8. service-worker.js persists/updates the cosmetic counter state.
-9. Local account creation initializes a persistent uid and editable profile data.
-10. Account panel shows display name/headline plus saved-job, post, and upvote stats.
-11. Forum implementation tracks posts and per-user upvotes in local state, with Firebase-compatible save hooks through app.js.
+2. Fixed the dead hamburger button.
+   - The top-right menu now opens a drawer with Jobs, Company forums, Account/Profile, AI Search, and filters shortcuts.
 
-Deployment note:
-- If this is hosted as a static-only site, /api/jobs.js will not run. Deploy with Vercel/serverless support, Netlify Functions, Cloudflare Workers, or your own backend, then keep app.js pointed at the same-origin endpoint.
+3. Fixed AI Search.
+   - The AI Search button now redirects to https://mewannajob.com.
+
+4. Preserved local profile/forum state.
+   - Local/Firebase profile state remains initialized by app.js.
+   - Forum posts/upvotes remain tied to HiringCafeAuth state.
+
+5. Kept the CORS-safe Job Data Pool proxy approach.
+   - /api/jobs remains the browser endpoint.
+   - Added a Netlify Function at netlify/functions/jobs.js.
+   - netlify.toml now rewrites /api/jobs to the Netlify function.
+   - Vercel-style api/jobs.js is still included for Vercel deployments.
+
+What went wrong in the previous bundle:
+- The older forum implementation had hash routing for #forums and #company/... routes.
+- I replaced it with the local profile/post tracking version but did not wire app.js to unhide #forumView when the Company forums tab was clicked.
+- The hamburger and AI Search buttons existed in HTML but had no click handlers.

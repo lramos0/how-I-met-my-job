@@ -70,9 +70,12 @@
   }
 
   function cacheEls(){
-    for (const id of ["searchInput","industryFilter","seniorityFilter","sortSelect","resultCount","syncStatus","sections","errorBox","accountButton","accountPanel","googleLogin","localLogin","logoutButton","accountStatus","savedOnly","clearFilters"]){
+    for (const id of ["searchInput","industryFilter","seniorityFilter","sortSelect","resultCount","syncStatus","sections","errorBox","accountButton","accountPanel","googleLogin","localLogin","logoutButton","accountStatus","savedOnly","clearFilters","jobsMain","forumView","navJobs","navForums"]){
       app.els[id] = document.getElementById(id);
     }
+    app.els.aiButton = document.querySelector(".ai-btn");
+    app.els.menuButton = document.querySelector(".menu-btn");
+    app.els.addCareerButton = document.querySelector(".green-btn");
   }
 
   function bindEvents(){
@@ -86,8 +89,15 @@
     app.els.googleLogin.addEventListener("click", googleLogin);
     app.els.localLogin.addEventListener("click", localLogin);
     app.els.logoutButton.addEventListener("click", logout);
+    app.els.aiButton?.addEventListener("click", () => { window.location.href = "https://mewannajob.com"; });
+    app.els.addCareerButton?.addEventListener("click", () => openDrawer("Add Career Page", "Send this button to your company submission flow or backend endpoint. For now it is wired instead of being a dead click."));
+    app.els.menuButton?.addEventListener("click", openTopMenu);
+    app.els.navJobs?.addEventListener("click", (e) => { e.preventDefault(); location.hash = ""; routeMainView(); });
+    app.els.navForums?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "forums"; routeMainView(); });
+    window.addEventListener("hashchange", routeMainView);
     bindHeaderFilterChips();
     bindTopbarShortcuts();
+    routeMainView();
   }
 
   function scrollToolbarIntoView(){
@@ -127,6 +137,44 @@
       btn.classList.add("active");
       scrollToolbarIntoView();
     });
+  }
+
+  function routeMainView(){
+    const raw = (location.hash || "").replace(/^#/, "").replace(/^!/, "");
+    const isForum = raw === "forums" || raw === "forums/" || raw.startsWith("company/") || raw === "f" || raw.startsWith("f/");
+    if (raw === "f" || raw === "f/") { location.replace("#forums"); return; }
+    if (raw.startsWith("f/")) { location.replace("#company/" + encodeURIComponent(decodeURIComponent(raw.slice(2).split("/")[0] || ""))); return; }
+    app.els.jobsMain?.classList.toggle("hidden", isForum);
+    app.els.forumView?.classList.toggle("hidden", !isForum);
+    app.els.navJobs?.classList.toggle("is-active", !isForum);
+    app.els.navForums?.classList.toggle("is-active", isForum);
+    document.querySelector(".filters")?.classList.toggle("hidden", isForum);
+    document.querySelector(".hire-banner")?.classList.toggle("hidden", isForum);
+    document.querySelector(".toolbar")?.classList.toggle("hidden", isForum);
+    if (isForum) window.dispatchEvent(new CustomEvent("hiringcafe:showforums", { detail: { hash: raw } }));
+  }
+
+  function openTopMenu(){
+    const signedIn = !!app.user;
+    openDrawer("Menu", `
+      <div class="menu-stack">
+        <button type="button" data-menu-action="jobs">Jobs</button>
+        <button type="button" data-menu-action="forums">Company forums</button>
+        <button type="button" data-menu-action="account">${signedIn ? "Profile / account" : "Sign up / log in"}</button>
+        <button type="button" data-menu-action="ai">AI Search at mewannajob.com ↗</button>
+        <button type="button" data-menu-action="filters">Jump to filters</button>
+      </div>
+    `);
+    const drawer = document.querySelector(".drawer");
+    drawer?.querySelectorAll("[data-menu-action]").forEach(btn => btn.addEventListener("click", () => {
+      const action = btn.dataset.menuAction;
+      drawer.remove();
+      if (action === "jobs") { location.hash = ""; routeMainView(); }
+      if (action === "forums") { location.hash = "forums"; routeMainView(); }
+      if (action === "account") { app.els.accountPanel?.classList.remove("hidden"); routeMainView(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (action === "ai") window.location.href = "https://mewannajob.com";
+      if (action === "filters") { location.hash = ""; routeMainView(); scrollToolbarIntoView(); }
+    }));
   }
 
   function bindHeaderFilterChips(){
