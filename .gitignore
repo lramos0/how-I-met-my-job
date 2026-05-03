@@ -1,4 +1,5 @@
-
+*.DS_Store
+*.idea
 dataset
 .venv
 job_posting.csv
@@ -8,6 +9,4 @@ __pycache__/
 .csv
 app.py
 parsed_resume.json
-admin-scripts/bronze_jobs.json
-admin-scripts/gold_jobs.json
-admin-scripts/silver_jobs.json
+admin-scripts*

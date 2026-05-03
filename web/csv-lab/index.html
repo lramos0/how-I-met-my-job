@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Lab — in-browser worker SQL</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --card: rgba(14, 27, 46, 0.9);
+      --border: rgba(67, 224, 255, 0.22);
+      --cyan: #43e0ff;
+      --text: #eaf6ff;
+      --muted: #97afc6;
+      --error: #ff8b8b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: linear-gradient(180deg, var(--bg), #050b14);
+      color: var(--text);
+      padding: 32px 20px 48px;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .sub code { color: var(--cyan); font-size: 0.88em; }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    label.file-label {
+      display: inline-block;
+      cursor: pointer;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    #csvFile { display: none; }
+    #meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    #tableWrap {
+      max-height: min(520px, 60vh);
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(98, 168, 255, 0.15);
+      background: rgba(5, 12, 22, 0.6);
+    }
+    table.dataframe {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      font-family: var(--mono);
+    }
+    table.dataframe th,
+    table.dataframe td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(98, 168, 255, 0.12);
+    }
+    table.dataframe th {
+      position: sticky;
+      top: 0;
+      background: rgba(10, 23, 39, 0.95);
+      color: var(--cyan);
+      font-weight: 600;
+    }
+    .prompt-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+    .prompt-row label {
+      color: var(--cyan);
+      flex-shrink: 0;
+    }
+    #sqlPrompt {
+      flex: 1;
+      background: rgba(5, 12, 22, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+    }
+    #sqlPrompt:focus {
+      outline: 2px solid rgba(67, 224, 255, 0.35);
+      outline-offset: 2px;
+    }
+    #sqlError {
+      margin-top: 10px;
+      color: var(--error);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+    }
+    #sqlError[hidden] { display: none; }
+    #swStatus {
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    a.back {
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    a.back:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="../index.html">← MeWannaJob home</a>
+    <h1>CSV Lab</h1>
+    <p class="sub">
+      Load a CSV: parsing and queries run in a <strong>scoped service worker</strong> (not on a server).
+      Micro-SQL: <code>SELECT *</code>, <code>SELECT col1, col2</code>,
+      <code>SELECT DISTINCT col</code> or <code>SELECT DISTINCT (col)</code>,
+      optional <code>WHERE col = 'value' AND …</code>. Type <code>RESET</code> or leave empty + Enter to show the loaded preview again.
+    </p>
+
+    <div class="panel">
+      <label class="file-label" for="csvFile">Choose .csv file</label>
+      <input type="file" id="csvFile" accept=".csv,text/csv" />
+      <div id="meta"></div>
+      <div id="tableWrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="prompt-row">
+        <label for="sqlPrompt">&gt;</label>
+        <input type="text" id="sqlPrompt" placeholder="SELECT DISTINCT(JOBS) WHERE location = 'US'" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="sqlError" hidden></div>
+    </div>
+
+    <p id="swStatus"></p>
+  </div>
+  <script src="csv-lab-client.js"></script>
+</body>
+</html>
