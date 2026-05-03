@@ -29,11 +29,11 @@ Then open `http://localhost:8000`.
 1. Create or open a Firebase project.
 2. Add a Web app in Firebase Project Settings.
 3. Enable Authentication -> Sign-in method -> Google.
-4. Create a Firestore database.
+4. Create a Firestore database in **Firestore Database**, not Realtime Database. Choose Native mode if prompted, start in production mode, and pick the region you want to keep.
 5. Paste your Firebase web config into `firebase-config.js`.
 6. Add the Firestore indexes and starter rules in [`documentation/firestore-production.md`](documentation/firestore-production.md).
 
-The app writes private job state under `users/{uid}/private/jobState` and public community data under `forumPosts`, `forumComments`, `forumVotes`, and `users`.
+You do not need to manually create tables. Firestore collections are created by the app when the first profile, saved job, post, comment, or vote is written. The app writes private job state under `users/{uid}/private/jobState` and public community data under `forumPosts`, `forumComments`, `forumVotes`, and `users`.
 
 ## Anti-scraping note
 

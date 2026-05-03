@@ -21,7 +21,7 @@
   const PROFILE_KEY = "hc_profile_v1";
   const COUNTER_KEY = "hc_live_counters_v1";
   const app = {
-    jobs: [], filtered: [], savedOnly: false, user: null, profile: null, db: null, authReady: false,
+    jobs: [], filtered: [], savedOnly: false, user: null, profile: null, db: null, authReady: false, cloudOffline: false,
     state: { saved: {}, applied: {}, hidden: {}, posts: {}, upvotes: {}, postVotes: {} },
     counters: null,
     els: {},
@@ -103,6 +103,7 @@
     app.els.navJobs?.addEventListener("click", (e) => { e.preventDefault(); location.hash = ""; routeMainView(); });
     app.els.navForums?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "forums"; routeMainView(); });
     window.addEventListener("hashchange", routeMainView);
+    window.addEventListener("online", retryCloudSync);
     bindHeaderFilterChips();
     bindTopbarShortcuts();
     routeMainView();
@@ -267,12 +268,15 @@
         firebase.auth().onAuthStateChanged(async user => {
           app.user = user ? { uid: user.uid, name: user.displayName || user.email, email: user.email, google: true } : null;
           app.authReady = true;
+          app.cloudOffline = false;
           restoreProfile();
           if (app.user && app.db) {
             try {
               await loadCloudProfile();
               await ensureUserDocument();
-            } catch (e) { console.warn("Could not load profile", e); }
+            } catch (e) {
+              handleCloudFailure("profile sync", e);
+            }
           }
           await loadState();
           updateAccountUi();
@@ -621,7 +625,11 @@
       return;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
-    await firebase.auth().signInWithPopup(provider);
+    try {
+      await firebase.auth().signInWithPopup(provider);
+    } catch (err) {
+      openDrawer("Google sign-in failed", esc(err?.message || "Firebase could not complete sign-in. Check your Firebase config and authorized domains."));
+    }
   }
   async function localLogin(){
     const existing = readJson(ACCOUNT_KEY, null) || readJson(LEGACY_ACCOUNT_KEY, null);
@@ -657,15 +665,71 @@
   }
   async function loadState(){
     if (app.user?.google && app.db) {
-      const snap = await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").get();
-      app.state = { ...defaultState(), ...(snap.exists ? snap.data() : {}) };
+      try {
+        const snap = await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").get();
+        app.state = { ...defaultState(), ...(snap.exists ? snap.data() : {}) };
+        cacheLocalState();
+        return;
+      } catch (err) {
+        handleCloudFailure("saved job state", err);
+        app.state = readLocalState();
+        return;
+      }
     } else {
-      try { app.state = { ...defaultState(), ...(JSON.parse(localStorage.getItem(STATE_KEY) || "null") || {}) }; } catch { app.state = defaultState(); }
+      app.state = readLocalState();
     }
   }
   async function saveState(){
-    if (app.user?.google && app.db) await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").set(app.state, { merge:true });
-    else localStorage.setItem(STATE_KEY, JSON.stringify(app.state));
+    cacheLocalState();
+    if (app.user?.google && app.db) {
+      try {
+        await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").set(app.state, { merge:true });
+        app.cloudOffline = false;
+      } catch (err) {
+        handleCloudFailure("saved job state", err);
+      }
+    }
+  }
+  async function retryCloudSync(){
+    if (!(app.user?.google && app.db)) return;
+    try {
+      await ensureUserDocument();
+      await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").set(app.state, { merge:true });
+      app.cloudOffline = false;
+      updateAccountUi();
+      window.dispatchEvent(new CustomEvent("hiringcafe:firebase", { detail: { db: app.db, user: app.user } }));
+    } catch (err) {
+      handleCloudFailure("reconnect", err);
+      updateAccountUi();
+    }
+  }
+  function stateStorageKey(){
+    return app.user?.uid ? `${STATE_KEY}:${app.user.uid}` : STATE_KEY;
+  }
+  function readLocalState(){
+    try {
+      return { ...defaultState(), ...(readJson(stateStorageKey(), null) || readJson(STATE_KEY, null) || {}) };
+    } catch {
+      return defaultState();
+    }
+  }
+  function cacheLocalState(){
+    try {
+      localStorage.setItem(stateStorageKey(), JSON.stringify(app.state));
+      localStorage.setItem(STATE_KEY, JSON.stringify(app.state));
+    } catch (err) {
+      console.warn("Could not cache local state", err);
+    }
+  }
+  function isCloudOfflineError(err){
+    const code = String(err?.code || "").toLowerCase();
+    const message = String(err?.message || err || "").toLowerCase();
+    return code === "unavailable" || code === "failed-precondition" || /offline|network|unavailable|failed to get document/.test(message);
+  }
+  function handleCloudFailure(area, err){
+    app.cloudOffline = true;
+    const label = isCloudOfflineError(err) ? "Firestore is offline; using local cache for now" : `Firestore ${area} failed; using local cache for now`;
+    console.warn(label, err);
   }
   function updateAccountUi(){
     const logged = !!app.user;
@@ -674,7 +738,7 @@
       app.els.accountButton.setAttribute("aria-label", logged ? "Open your profile and account panel" : "Join or sign in");
     }
     if (app.els.accountStatus) app.els.accountStatus.textContent = logged
-      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs stay private; ${app.user.google ? "forum posts, comments, votes, and profile data sync through Firestore" : "local forum activity stays in this browser"}.`
+      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. ${app.cloudOffline ? "Firestore is unreachable right now, so changes are kept in this browser and will retry when the connection comes back." : `Saved jobs stay private; ${app.user.google ? "forum posts, comments, votes, and profile data sync through Firestore" : "local forum activity stays in this browser"}.`}`
       : "Create a profile to save jobs, post in company forums, comment, and vote. Google syncs across devices; local mode is just for this browser.";
     app.els.logoutButton?.classList.toggle("hidden", !logged);
     app.els.googleLogin?.classList.toggle("hidden", logged);
@@ -792,11 +856,16 @@
     localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
     if (app.user.google && app.db) {
       const { stats, ...profileForCloud } = app.profile;
-      await app.db.collection("users").doc(app.user.uid).set({
-        uid: app.user.uid,
-        profile: profileForCloud,
-        updatedAt: Date.now()
-      }, { merge: true });
+      try {
+        await app.db.collection("users").doc(app.user.uid).set({
+          uid: app.user.uid,
+          profile: profileForCloud,
+          updatedAt: Date.now()
+        }, { merge: true });
+        app.cloudOffline = false;
+      } catch (err) {
+        handleCloudFailure("profile save", err);
+      }
     }
     return app.profile;
   }
