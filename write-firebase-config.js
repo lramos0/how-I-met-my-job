@@ -30,7 +30,7 @@ const cleanConfig = Object.fromEntries(
 const file = `// Generated at build time by scripts/write-firebase-config.js
 // Do not commit real Firebase config manually if you are using Netlify env vars.
 
-window.HIRING_CAFE_FIREBASE_CONFIG = ${JSON.stringify(cleanConfig, null, 2)};
+window.HIRINGCAFE_FIREBASE_CONFIG = ${JSON.stringify(cleanConfig, null, 2)};
 `;
 
 fs.writeFileSync("firebase-config.js", file);
