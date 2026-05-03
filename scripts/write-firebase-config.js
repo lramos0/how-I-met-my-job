@@ -1,7 +1,7 @@
 const fs = require("fs");
 
 const required = [
-  "FIREBASE_KEY",
+  "FIREBASE_PUBLIC_ACCESS_TOKEN",
   "FIREBASE_AUTH_DOMAIN",
   "FIREBASE_PROJECT_ID",
   "FIREBASE_APP_ID"
