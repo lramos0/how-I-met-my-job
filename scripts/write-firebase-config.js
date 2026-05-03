@@ -14,7 +14,7 @@ if (missing.length) {
 }
 
 const config = {
-  apiKey: process.env.FIREBASE_KEY,
+  apiKey: process.env.FIREBASE_PUBLIC_ACCESS_TOKEN,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
   projectId: process.env.FIREBASE_PROJECT_ID,
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET || undefined,

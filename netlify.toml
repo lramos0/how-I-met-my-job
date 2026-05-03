@@ -1,6 +1,7 @@
 [build]
-  command = "node scripts/write-firebase-config.js"
+  command = "node write-firebase-config.js"
   publish = "."
+
 [[headers]]
   for = "/data/*"
   [headers.values]

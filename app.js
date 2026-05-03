@@ -172,42 +172,18 @@
 
   function initFirebaseWhenReady(){
     window.addEventListener("load", async () => {
-      const cfg =
-        window.HIRING_CAFE_FIREBASE_CONFIG ||
-        window.HIRINGCAFE_FIREBASE_CONFIG ||
-        {};
-
-      const configured =
-        cfg.apiKey &&
-        cfg.authDomain &&
-        cfg.projectId &&
-        cfg.appId &&
-        window.firebase;
-
+      const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
+      const configured = cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId && window.firebase;
       if (!configured) {
         restoreLocalAccount();
-        app.authReady = true;
         updateAccountUi();
         return;
       }
-
       try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(cfg);
-        }
-
+        firebase.initializeApp(cfg);
         app.db = firebase.firestore();
-
         firebase.auth().onAuthStateChanged(async user => {
-          app.user = user
-            ? {
-                uid: user.uid,
-                name: user.displayName || user.email,
-                email: user.email,
-                google: true
-              }
-            : null;
-
+          app.user = user ? { uid: user.uid, name: user.displayName || user.email, email: user.email, google: true } : null;
           app.authReady = true;
           await loadState();
           updateAccountUi();
@@ -216,7 +192,6 @@
       } catch (err) {
         console.warn("Firebase unavailable; falling back to local account", err);
         restoreLocalAccount();
-        app.authReady = true;
         updateAccountUi();
       }
     });
@@ -547,16 +522,11 @@
   }
 
   async function googleLogin(){
-    const cfg =
-      window.HIRING_CAFE_FIREBASE_CONFIG ||
-      window.HIRINGCAFE_FIREBASE_CONFIG ||
-      {};
-
+    const cfg = window.HIRINGCAFE_FIREBASE_CONFIG || {};
     if (!(cfg.apiKey && window.firebase && firebase.apps.length)) {
       openDrawer("Google login not configured", "Add your Firebase config in firebase-config.js, then enable Google Authentication and Firestore. For now, use the local account to test saved listings.");
       return;
     }
-
     const provider = new firebase.auth.GoogleAuthProvider();
     await firebase.auth().signInWithPopup(provider);
   }
