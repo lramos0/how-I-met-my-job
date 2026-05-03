@@ -1,0 +1,20 @@
+HiringCafe v4 fix bundle
+
+Changed files:
+- app.js
+- forum.js
+- styles.css
+- lib/fortune500.js included for compatibility
+
+What this fixes:
+1. Company forums now render the Fortune 500 hub again from window.Fortune500 instead of the stripped-down generic feed.
+2. #forums shows all Fortune companies; #company/<slug> opens a company page. Legacy #f routes redirect.
+3. Upvote/downvote is implemented for posts and comments. One signed-in/local user can toggle up/down and the score adjusts correctly.
+4. Posting/commenting/voting now require a profile and will open the account panel if the user is not signed in.
+5. Local account creation now initializes a stable user uid, profile object, display name/headline, and profile stats.
+6. The account button changes from Sign up to the profile display name once local login succeeds.
+7. Profile data is stored per-user in localStorage and mirrored to Firestore when Google/Firebase is configured.
+8. Styles added for the profile card and hamburger menu.
+
+Deployment:
+Replace the matching files in your site with these files. Keep the existing script order in index.html: fortune500.js, forum.js, then app.js.

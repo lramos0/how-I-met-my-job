@@ -1133,24 +1133,22 @@ main {
   }
 }
 
-/* Runtime hamburger menu drawer buttons */
-.menu-stack {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
+
+/* Account/profile + hamburger drawer controls */
+.profile-card {
+  flex: 1 1 280px;
+  min-width: min(100%, 260px);
+  border: 1px solid rgba(219, 39, 119, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff 0%, #fff7fb 100%);
+  padding: 14px;
 }
-.menu-stack button {
-  width: 100%;
-  border: 1px solid var(--jp-border, #e2e8f0);
-  border-radius: 12px;
-  background: var(--jp-surface, #fff);
-  color: var(--jp-ink, #0f172a);
-  padding: 12px 14px;
-  text-align: left;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-.menu-stack button:hover {
-  background: var(--jp-surface-shell, #f1f5f9);
-}
+.profile-card h3 { margin: 0 0 10px; font-size: 16px; }
+.profile-card label { display: grid; gap: 6px; margin: 8px 0; font-weight: 700; color: var(--jp-ink-secondary); }
+.profile-card input { width: 100%; border: 1px solid var(--jp-border); border-radius: 10px; padding: 10px 12px; font: inherit; background: #fff; }
+.profile-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.profile-stats span { border: 1px solid var(--jp-border); background: var(--jp-surface); border-radius: 999px; padding: 6px 10px; font-weight: 800; font-size: 12px; color: var(--jp-ink-secondary); }
+.menu-stack { display: grid; gap: 8px; }
+.menu-stack button { text-align: left; border: 1px solid var(--jp-border); border-radius: 12px; background: var(--jp-surface); padding: 10px 12px; font: inherit; font-weight: 800; cursor: pointer; }
+.menu-stack button:hover { background: var(--jp-surface-shell); }
+@media (max-width: 760px) { .account-panel { flex-direction: column; } }

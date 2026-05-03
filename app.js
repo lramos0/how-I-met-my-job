@@ -15,7 +15,8 @@
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
   const ENABLE_JOB_CACHE = window.JDP_ENABLE_JOB_CACHE === true;
   const JOB_CACHE_MAX_BYTES = Number(window.JDP_CACHE_MAX_BYTES) || 900_000;
-  const ACCOUNT_KEY = "hc_account_v2";
+  const ACCOUNT_KEY = "hc_account_v1";
+  const LEGACY_ACCOUNT_KEY = "hc_account_v2";
   const STATE_KEY = "hc_job_state_v2";
   const PROFILE_KEY = "hc_profile_v1";
   const COUNTER_KEY = "hc_live_counters_v1";
@@ -54,7 +55,10 @@
   async function init(){
     cacheEls();
     bindEvents();
+    restoreLocalAccount();
+    restoreProfile();
     initFirebaseWhenReady();
+    updateAccountUi();
     try {
       setSync("Loading job listings…");
       app.jobs = await loadJobsDataset();
@@ -257,6 +261,16 @@
         firebase.auth().onAuthStateChanged(async user => {
           app.user = user ? { uid: user.uid, name: user.displayName || user.email, email: user.email, google: true } : null;
           app.authReady = true;
+          restoreProfile();
+          if (app.user && app.db) {
+            try {
+              const profileSnap = await app.db.collection("users").doc(app.user.uid).get();
+              if (profileSnap.exists && profileSnap.data().profile) {
+                app.profile = { ...defaultProfile(), ...profileSnap.data().profile };
+                localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
+              }
+            } catch (e) { console.warn("Could not load profile", e); }
+          }
           await loadState();
           updateAccountUi();
           applyFilters();
@@ -604,16 +618,37 @@
     await firebase.auth().signInWithPopup(provider);
   }
   async function localLogin(){
-    const existing = readJson(ACCOUNT_KEY, null);
+    const existing = readJson(ACCOUNT_KEY, null) || readJson(LEGACY_ACCOUNT_KEY, null);
     app.user = existing || { uid: `local-${Date.now().toString(36)}`, name: "Local Account", local: true, createdAt: Date.now() };
+    app.user.local = true;
+    if (!app.user.uid) app.user.uid = `local-${Date.now().toString(36)}`;
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
+    localStorage.removeItem(LEGACY_ACCOUNT_KEY);
     restoreProfile();
     await loadState();
     updateAccountUi();
     applyFilters();
+    app.els.accountPanel?.classList.remove("hidden");
+    window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: app.user, profile: app.profile, state: app.state } }));
   }
-  async function logout(){ if (window.firebase && firebase.apps.length) await firebase.auth().signOut().catch(()=>{}); app.user=null; localStorage.removeItem(ACCOUNT_KEY); updateAccountUi(); }
-  function restoreLocalAccount(){ try { app.user = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch { app.user = null; } }
+  async function logout(){
+    if (window.firebase && firebase.apps.length) await firebase.auth().signOut().catch(()=>{});
+    app.user = null;
+    app.profile = null;
+    localStorage.removeItem(ACCOUNT_KEY);
+    localStorage.removeItem(LEGACY_ACCOUNT_KEY);
+    updateAccountUi();
+    window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: null, profile: null, state: app.state } }));
+  }
+  function restoreLocalAccount(){
+    app.user = readJson(ACCOUNT_KEY, null) || readJson(LEGACY_ACCOUNT_KEY, null);
+    if (app.user) {
+      if (!app.user.uid) app.user.uid = `local-${Date.now().toString(36)}`;
+      app.user.local = app.user.local !== false && !app.user.google;
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
+      localStorage.removeItem(LEGACY_ACCOUNT_KEY);
+    }
+  }
   async function loadState(){
     if (app.user?.google && app.db) {
       const snap = await app.db.collection("users").doc(app.user.uid).collection("private").doc("jobState").get();
@@ -628,13 +663,13 @@
   }
   function updateAccountUi(){
     const logged = !!app.user;
-    app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Account") : "Sign up";
-    app.els.accountStatus.textContent = logged
-      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs, posts, and upvotes are ${app.user.google ? "syncing to Firestore" : "stored locally in this browser"}.`
-      : "Create a profile to save jobs, post in forums, and track upvotes. Google sync works when Firebase is configured; otherwise local mode is fully usable.";
-    app.els.logoutButton.classList.toggle("hidden", !logged);
-    app.els.googleLogin.classList.toggle("hidden", logged);
-    app.els.localLogin.classList.toggle("hidden", logged);
+    if (app.els.accountButton) app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Profile") : "Sign up";
+    if (app.els.accountStatus) app.els.accountStatus.textContent = logged
+      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. Saved jobs, posts, comments, and votes are ${app.user.google ? "syncing to Firestore" : "stored locally in this browser"}.`
+      : "Create a local profile now, or use Google after Firebase is configured. Local mode is fully usable for saved jobs, forum posts, comments, and upvotes/downvotes.";
+    app.els.logoutButton?.classList.toggle("hidden", !logged);
+    app.els.googleLogin?.classList.toggle("hidden", logged);
+    app.els.localLogin?.classList.toggle("hidden", logged);
     renderProfilePanel();
     window.dispatchEvent(new CustomEvent("hiringcafe:authchange", { detail: { user: app.user, profile: app.profile, state: app.state } }));
   }
@@ -655,12 +690,12 @@
     }
     const profile = app.profile || defaultProfile();
     const posts = Object.values(app.state.posts || {}).filter(p => p.authorUid === app.user.uid).length;
-    const upvotes = Object.keys(app.state.upvotes || {}).length;
+    const votes = Object.keys(app.state.upvotes || {}).filter(k => k.startsWith(`${app.user.uid}:`)).length;
     card.innerHTML = `
       <h3>Your profile</h3>
       <label>Display name <input id="profileDisplayName" value="${escAttr(profile.displayName || '')}" placeholder="Display name"></label>
       <label>Headline <input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="Software engineer, student, recruiter…"></label>
-      <div class="profile-stats"><span>${posts} posts</span><span>${upvotes} upvotes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
+      <div class="profile-stats"><span>${posts} posts</span><span>${votes} votes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
       <button class="primary-btn" id="saveProfileBtn" type="button">Save profile</button>
     `;
     card.querySelector("#saveProfileBtn")?.addEventListener("click", saveProfileFromPanel);
@@ -676,10 +711,15 @@
     };
   }
 
+  function profileStorageKey(){
+    return app.user?.uid ? `${PROFILE_KEY}:${app.user.uid}` : PROFILE_KEY;
+  }
+
   function restoreProfile(){
-    const saved = readJson(PROFILE_KEY, null);
-    app.profile = saved || (app.user ? defaultProfile() : null);
-    if (app.user && !saved) localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
+    if (!app.user) { app.profile = null; return; }
+    const saved = readJson(profileStorageKey(), null) || readJson(PROFILE_KEY, null);
+    app.profile = { ...defaultProfile(), ...(saved || {}) };
+    localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
   }
 
   async function saveProfileFromPanel(){
@@ -693,6 +733,7 @@
     };
     app.user.name = app.profile.displayName;
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(app.user));
+    localStorage.setItem(profileStorageKey(), JSON.stringify(app.profile));
     localStorage.setItem(PROFILE_KEY, JSON.stringify(app.profile));
     if (app.user.google && app.db) await app.db.collection("users").doc(app.user.uid).set({ profile: app.profile }, { merge: true });
     updateAccountUi();

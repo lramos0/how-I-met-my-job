@@ -1,12 +1,6 @@
 [build]
   command = "node write-firebase-config.js"
   publish = "."
-  functions = "netlify/functions"
-
-[[redirects]]
-  from = "/api/jobs"
-  to = "/.netlify/functions/jobs"
-  status = 200
 
 [[headers]]
   for = "/data/*"
