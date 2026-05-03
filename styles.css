@@ -1132,3 +1132,25 @@ main {
     justify-self: end;
   }
 }
+
+/* Runtime hamburger menu drawer buttons */
+.menu-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.menu-stack button {
+  width: 100%;
+  border: 1px solid var(--jp-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--jp-surface, #fff);
+  color: var(--jp-ink, #0f172a);
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.menu-stack button:hover {
+  background: var(--jp-surface-shell, #f1f5f9);
+}
