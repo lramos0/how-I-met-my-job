@@ -5,7 +5,7 @@
   const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);
   const REMOTE_BATCH_SIZE = Math.min(500, Number(window.JDP_REMOTE_BATCH_SIZE) || 500);
   const REMOTE_BATCHES = Math.min(4, Number(window.JDP_REMOTE_BATCHES) || 4);
-  const LISTINGS_MAX = Math.min(6000, Number(window.JDP_LISTINGS_MAX) || (LOCAL_LISTINGS_MAX + (REMOTE_BATCH_SIZE * REMOTE_BATCHES)));
+  const LISTINGS_MAX = Math.min(1000, Number(window.JDP_LISTINGS_MAX) || (LOCAL_LISTINGS_MAX + (REMOTE_BATCH_SIZE * REMOTE_BATCHES)));
   const CACHE_KEY = "jdp_merged_jobs_v2";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
   const ACCOUNT_KEY = "hc_account_v2";
