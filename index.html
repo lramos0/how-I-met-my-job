@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TheHiringCafe — Jobs & company forums</title>
+  <meta name="description" content="TheHiringCafe: browse open job listings, Fortune 500 company forums, and share application stories — powered by Job Data Pool." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="survey.css" />
+  <link rel="stylesheet" href="forum.css" />
+  <script src="lib/domain-overrides.js" defer></script>
+  <script src="lib/fortune500.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" defer></script>
+  <script src="firebase-config.js" defer></script>
+  <script src="data/jobs_restored.js" defer></script>
+  <script src="survey.js" defer></script>
+  <script src="forum.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="top-shell">
+    <div class="masthead">
+      <div class="masthead-inner">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <svg class="brand-cup" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="52" height="52" role="img" aria-label="">
+              <path class="cup-steam" d="M12 11c1.2-3 3.5-4 5-1.5s-1 5-3 2.5M19 9c1-2.8 3-3.5 4.5-1s0 4.5-2 2.5M26 10c1.5-3.5 4-4 5.5-.5s-2 5.5-4 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <ellipse cx="24" cy="39" rx="15" ry="4" fill="#ead5cb"/>
+              <path d="M13 21h22v15c0 5.5-4.5 9.5-11 9.5s-11-4-11-9.5V21z" fill="#fff" stroke="#cfa896" stroke-width="1.4"/>
+              <path d="M15 24h18v10c0 4-3 7-9 7s-9-3-9-7v-10z" fill="#6b4423"/>
+              <ellipse cx="24" cy="24" rx="9" ry="3" fill="#8b5a3c"/>
+              <path d="M24 27c-2.5-3-7-2-7 2.2 0 3.5 7 6.8 7 6.8s7-3.3 7-6.8c0-4.2-4.5-5.2-7-2.2z" fill="#fdf6f0"/>
+              <circle cx="18.5" cy="31" r="1.6" fill="#334155"/>
+              <circle cx="29.5" cy="31" r="1.6" fill="#334155"/>
+              <path d="M20 34.5q4 2.5 8 0" fill="none" stroke="#334155" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M35 23c5.5 0 8 3.2 8 7.5s-2.8 8-8 8" fill="none" stroke="#cfa896" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <div class="brand-text">
+            <p class="masthead-eyebrow">Job Data Pool · community brew</p>
+            <h1 class="masthead-title">TheHiringCafe</h1>
+          </div>
+        </div>
+        <nav class="masthead-tabs" aria-label="Site sections">
+          <a href="#" id="navJobs" class="masthead-tab is-active">Jobs</a>
+          <a href="#f" id="navForums" class="masthead-tab">Company forums</a>
+        </nav>
+        <p class="masthead-meta">
+          Listings from the <a href="https://jobdatapool.com" rel="noopener noreferrer">Job Data Pool</a> ecosystem ·
+          <button type="button" class="masthead-survey-link" data-open-outcome-survey>Share your application outcome</button>
+        </p>
+      </div>
+    </div>
+    <header class="topbar" aria-label="Primary search controls">
+      <button class="brand-dot" type="button" aria-label="TheHiringCafe — scroll to filters">
+        <svg class="brand-cup brand-cup--sm" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="26" height="26" aria-hidden="true">
+          <path class="cup-steam" d="M12 11c1.2-3 3.5-4 5-1.5s-1 5-3 2.5M19 9c1-2.8 3-3.5 4.5-1s0 4.5-2 2.5M26 10c1.5-3.5 4-4 5.5-.5s-2 5.5-4 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <ellipse cx="24" cy="39" rx="15" ry="4" fill="#ead5cb"/>
+          <path d="M13 21h22v15c0 5.5-4.5 9.5-11 9.5s-11-4-11-9.5V21z" fill="#fff" stroke="#cfa896" stroke-width="1.4"/>
+          <path d="M15 24h18v10c0 4-3 7-9 7s-9-3-9-7v-10z" fill="#6b4423"/>
+          <ellipse cx="24" cy="24" rx="9" ry="3" fill="#8b5a3c"/>
+          <path d="M24 27c-2.5-3-7-2-7 2.2 0 3.5 7 6.8 7 6.8s7-3.3 7-6.8c0-4.2-4.5-5.2-7-2.2z" fill="#fdf6f0"/>
+          <circle cx="18.5" cy="31" r="1.6" fill="#334155"/>
+          <circle cx="29.5" cy="31" r="1.6" fill="#334155"/>
+          <path d="M20 34.5q4 2.5 8 0" fill="none" stroke="#334155" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M35 23c5.5 0 8 3.2 8 7.5s-2.8 8-8 8" fill="none" stroke="#cfa896" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="mode-pill" role="tablist" aria-label="Search mode">
+        <button class="active" type="button">Basic</button>
+        <button type="button">✦ Advanced</button>
+      </div>
+      <label class="search-box">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Search roles, companies, skills…" />
+      </label>
+      <button class="location-box" type="button" aria-label="Location filter">
+        <span class="pin">●</span>
+        <span><b>United States</b><small>Remote · Hybrid · Onsite · All Environments</small></span>
+        <span class="chev">⌄</span>
+      </button>
+      <button class="green-btn" type="button">⊕ Add Career Page</button>
+      <button id="accountButton" class="yellow-btn" type="button">Sign up</button>
+      <button class="ai-btn" type="button">✦ AI Search</button>
+      <button class="menu-btn" type="button" aria-label="Menu">☰</button>
+    </header>
+
+    <nav class="filters" aria-label="Job filters">
+      <button data-filter="Departments">Departments</button><button data-filter="Salary">Salary</button><button data-filter="Commitment">Commitment</button><button data-filter="Experience">Experience</button><button data-filter="Job Titles & Keywords">Job Titles & Keywords</button><button data-filter="Education">Education</button><button data-filter="Licenses & Certifications">Licenses & Certifications</button><button data-filter="Security Clearance">Security Clearance</button><button data-filter="Languages">Languages</button><button data-filter="Shifts & Schedules">Shifts & Schedules</button>
+      <button data-filter="Travel Requirement">Travel Requirement</button><button data-filter="Benefits & Perks">Benefits & Perks</button><button data-filter="Encouraged to Apply">Encouraged to Apply</button><span class="sep"></span><button class="orange" data-filter="Company">Company</button><button class="orange" data-filter="Industry">Industry</button><button class="orange" data-filter="Stage & Funding">Stage & Funding</button><button class="orange" data-filter="Size">Size</button><button class="orange" data-filter="Founding Year">Founding Year</button>
+    </nav>
+
+    <div class="hire-banner" role="note">
+      <span class="hire-banner-text">Know a company that is hiring?</span>
+      <a href="#">Add a company</a>
+    </div>
+  </div>
+
+  <main>
+    <div id="jobsMain">
+    <section id="accountPanel" class="account-panel hidden" aria-live="polite">
+      <div>
+        <h2>Account</h2>
+        <p id="accountStatus">Use Google login to sync saved and applied jobs. Without Firebase config, this app stores a local demo account in your browser.</p>
+      </div>
+      <div class="account-actions">
+        <button id="googleLogin" class="primary-btn" type="button">Continue with Google</button>
+        <button id="localLogin" class="ghost-btn" type="button">Use local account</button>
+        <button id="logoutButton" class="ghost-btn hidden" type="button">Log out</button>
+      </div>
+    </section>
+
+    <section class="toolbar" aria-label="Result controls">
+      <div><b id="resultCount">Loading jobs…</b><small id="syncStatus">Dataset initializing</small></div>
+      <label>Industry <select id="industryFilter"><option value="">All</option></select></label>
+      <label>Experience <select id="seniorityFilter"><option value="">All</option></select></label>
+      <label>Sort <select id="sortSelect"><option value="fresh">Newest</option><option value="score">Best match</option><option value="pay">Highest pay</option><option value="company">Company</option></select></label>
+      <button id="savedOnly" class="ghost-btn" type="button">Saved jobs</button>
+      <button id="clearFilters" class="ghost-btn" type="button">Clear</button>
+    </section>
+
+    <div id="errorBox" class="error hidden"></div>
+    <div id="sections" class="sections" aria-live="polite"></div>
+    </div>
+
+    <div id="forumView" class="forum-view hidden" aria-label="Company discussion forums">
+      <div id="forumRoot"></div>
+    </div>
+  </main>
+
+  <dialog id="outcomeSurveyDialog" class="survey-dialog" aria-labelledby="surveyTitle">
+    <div class="survey-inner">
+      <div class="survey-header">
+        <button type="button" class="survey-close" id="surveyCloseBtn" aria-label="Close dialog">×</button>
+        <p class="survey-kicker">Community outcomes</p>
+        <h2 id="surveyTitle" class="survey-title">Application outcome survey</h2>
+        <p class="survey-sub">
+          Inspired by transparent reporting on
+          <a href="https://www.thegradcafe.com" rel="noopener noreferrer">The GradCafe</a>
+          — search the Fortune 500, log your stage (interview, offer, etc.), and help others benchmark hiring paths.
+          Data stays in this browser unless you add a backend later.
+        </p>
+      </div>
+      <div class="survey-body">
+        <div id="surveySuccess" class="survey-success hidden" role="status"></div>
+        <div id="surveyFormBlock">
+          <div class="survey-field">
+            <label for="surveyCompanySearch">Company (Fortune 500)</label>
+            <div class="survey-search-wrap">
+              <input
+                id="surveyCompanySearch"
+                type="search"
+                autocomplete="off"
+                placeholder="Start typing e.g. Apple, Nike, Cisco…"
+              />
+              <div id="surveyCompanyResults" class="survey-results" role="listbox" aria-label="Matching companies"></div>
+            </div>
+            <div id="surveyPicked" class="survey-picked hidden">
+              <span id="surveyPickedIcon" class="survey-icon-slot" aria-hidden="true"></span>
+              <div>
+                <strong id="surveyPickedName"></strong>
+                <span id="surveyPickedMeta"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="survey-field">
+            <label>Resume (optional)</label>
+            <div id="surveyDropZone" class="survey-drop">
+              <input id="surveyResumeFile" type="file" accept=".txt,.text,.md,text/plain" />
+              <p><strong>Drop a plain-text resume</strong> or click to browse. For PDF or Word, paste text below.</p>
+            </div>
+          </div>
+
+          <div class="survey-field">
+            <label for="surveyResumePaste">Resume text (paste to auto-fill hints)</label>
+            <textarea id="surveyResumePaste" placeholder="Paste your resume or summary…"></textarea>
+          </div>
+
+          <div class="survey-field">
+            <label for="surveyFullName">Your name</label>
+            <input id="surveyFullName" type="text" autocomplete="name" placeholder="Jane Doe" />
+          </div>
+          <div class="survey-field">
+            <label for="surveyEmail">Email (optional)</label>
+            <input id="surveyEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+          </div>
+          <div class="survey-field">
+            <label for="surveyPhone">Phone (optional)</label>
+            <input id="surveyPhone" type="tel" autocomplete="tel" placeholder="+1 …" />
+          </div>
+
+          <div class="survey-field">
+            <label for="surveyOutcome">Outcome / stage</label>
+            <select id="surveyOutcome" required>
+              <option value="">Select…</option>
+              <option value="applied">Applied</option>
+              <option value="oa">Online assessment</option>
+              <option value="phone">Phone screen</option>
+              <option value="interview">Interview</option>
+              <option value="final">Final round</option>
+              <option value="offer">Offer received</option>
+              <option value="rejected">Rejected</option>
+              <option value="withdrawn">Withdrawn</option>
+            </select>
+          </div>
+          <div class="survey-field">
+            <label for="surveyDateApplied">Key date</label>
+            <input id="surveyDateApplied" type="date" />
+          </div>
+          <div class="survey-field">
+            <label for="surveyNotes">Notes (optional)</label>
+            <textarea id="surveyNotes" placeholder="Timeline, stack, comp band if you want to share…"></textarea>
+          </div>
+
+          <div class="survey-actions">
+            <button type="button" id="surveySubmitBtn" class="primary-btn">Save outcome locally</button>
+          </div>
+          <p class="survey-note">
+            Nothing is uploaded to a server in this demo — entries are stored in <code>localStorage</code> for your session history only.
+          </p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>
