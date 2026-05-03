@@ -1,16 +1,16 @@
 (() => {
   const DATA_PATHS = ["data/jobs_restored.csv", "./data/jobs_restored.csv", "/data/jobs_restored.csv"];
   /**
-   * Browser fetches must use a same-origin proxy. Direct calls to
-   * https://api.jobdatapool.com/v1/jobs are blocked by CORS in production.
-   * Deploy api/jobs.js (included in this patch) or point JDP_API_JOBS at your own backend.
+   * Local-only mode: this build intentionally does NOT call /api/jobs.
+   * It loads the shipped data/jobs_restored.js or data/jobs_restored.csv bundle only.
    */
+  const USE_REMOTE_JOBS = false;
   const API_JOBS = window.JDP_API_JOBS || "/api/jobs";
   const DIRECT_API_JOBS = window.JDP_DIRECT_API_JOBS || "";
   const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);
-  const REMOTE_BATCH_SIZE = Math.min(500, Number(window.JDP_REMOTE_BATCH_SIZE) || 500);
-  const REMOTE_BATCHES = Math.min(4, Number(window.JDP_REMOTE_BATCHES) || 4);
-  const LISTINGS_MAX = Math.min(6000, Number(window.JDP_LISTINGS_MAX) || (LOCAL_LISTINGS_MAX + (REMOTE_BATCH_SIZE * REMOTE_BATCHES)));
+  const REMOTE_BATCH_SIZE = 0;
+  const REMOTE_BATCHES = 0;
+  const LISTINGS_MAX = Math.min(4000, Number(window.JDP_LISTINGS_MAX) || LOCAL_LISTINGS_MAX);
   const CACHE_KEY = "jdp_merged_jobs_v3";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
   const ENABLE_JOB_CACHE = window.JDP_ENABLE_JOB_CACHE === true;
@@ -399,35 +399,13 @@
   }
 
   async function loadJobsDataset(){
-    const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
-    const forceLocal = params.has("local") || params.has("offline") || window.JDP_USE_LOCAL_DATA === true;
-
-    if (!forceLocal) {
-      const cached = readJobsCache();
-      if (cached && cached.length) {
-        setSync(`Ready — ${cached.length.toLocaleString()} merged listings (cached)`);
-        return cached;
-      }
-    }
-
+    // Local-only build: avoid /api/jobs entirely so rate limits or 502s cannot affect load.
+    // data/jobs_restored.js is loaded before app.js in index.html and exposes RESTORED_JOBS_CSV.
     setSync(`Loading ${LOCAL_LISTINGS_MAX.toLocaleString()} bundled listings…`);
     const localRows = await loadLocalJobsRows();
-    let remoteRows = [];
-
-    if (!forceLocal) {
-      try {
-        setSync(`Fetching ${REMOTE_BATCHES} × ${REMOTE_BATCH_SIZE} from Job Data Pool…`);
-        remoteRows = await fetchSampleListingsFromApi();
-      } catch (err) {
-        console.warn("Job Data Pool API unavailable; using bundled jobs only.", err);
-      }
-    }
-
-    const mergedRows = dedupeCsvRows([...localRows, ...remoteRows]).slice(0, LISTINGS_MAX);
-    const jobs = normalizeRows(mergedRows);
+    const jobs = normalizeRows(dedupeCsvRows(localRows).slice(0, LISTINGS_MAX));
     if (jobs.length) writeJobsCache(jobs);
-    const remoteMsg = remoteRows.length ? ` + ${remoteRows.length.toLocaleString()} live` : " + live API unavailable";
-    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} merged listings (${localRows.length.toLocaleString()} local${remoteMsg})` : "Ready");
+    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} local listings` : "Ready — no bundled listings found");
     return jobs;
   }
 
