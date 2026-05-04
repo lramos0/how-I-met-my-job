@@ -54,7 +54,13 @@
     }
   };
 
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (window.HiringCafePinGate?.requireAccess) {
+      const allowed = await window.HiringCafePinGate.requireAccess();
+      if (!allowed) return;
+    }
+    init();
+  });
 
   async function init(){
     cacheEls();
