@@ -5,6 +5,7 @@
    * Falls back to bundled local dataset when the upstream snapshot is unavailable.
    */
   const USE_REMOTE_JOBS = window.JDP_USE_REMOTE_JOBS !== false;
+  /** Default: Netlify Function R2 snapshot. Use "/api/jobs-stream" for edge-streamed Job Data Pool JSON (same query params). */
   const API_JOBS = window.JDP_API_JOBS || "/.netlify/functions/jobs-snapshot";
   const DIRECT_API_JOBS = window.JDP_DIRECT_API_JOBS || "";
   const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);

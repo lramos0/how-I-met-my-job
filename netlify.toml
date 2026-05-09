@@ -1,6 +1,11 @@
 [build]
   command = "node write-firebase-config.js"
   publish = "."
+  # Edge functions live in netlify/edge-functions/ (see inline path in each file).
+  # GET /api/jobs-stream — proxy-stream Job Data Pool JSON (set JDP_UPSTREAM in Netlify env, Functions scope).
+  # GET /api/jobs-csv-stream — proxy-stream R2 CSV snapshot (set JDP_R2_SNAPSHOT_URL or ?r2_url=).
+  # GET /.netlify/functions/jobs-paged — paged listings (prefers Netlify Blobs shards when built).
+  # Shards: netlify/functions/jobs-shard-scheduled.js (cron in netlify.toml, not a hand-called HTTP API).
 
 [[headers]]
   for = "/data/*"
@@ -10,3 +15,7 @@
     Cache-Control = "no-store"
 [functions]
   directory = "netlify/functions"
+
+[functions."jobs-shard-scheduled"]
+  schedule = "@daily"
+  timeout = 300

@@ -1,0 +1,7 @@
+{
+  "name": "how-i-met-my-job",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^10.7.4"
+  }
+}
