@@ -142,6 +142,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 12px;
+  align-items: center;
 }
 
 .masthead-tab {
@@ -155,12 +156,13 @@ body {
   color: var(--jp-ink-secondary);
   background: var(--jp-surface-shell);
   border: 1px solid var(--jp-border);
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
 .masthead-tab:hover {
   border-color: var(--jp-border-strong);
   color: var(--jp-ink);
+  transform: translateY(-1px);
 }
 
 .masthead-tab.is-active {
@@ -1146,7 +1148,7 @@ main {
 /* Header declutter: search is now the hero control. */
 .topbar .search-box {
   width: 100%;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 4px 12px rgba(219, 39, 119, 0.06);
 }
 .topbar .search-box:focus-within {
   border-color: var(--jp-teal);
@@ -1226,6 +1228,7 @@ main {
     margin: 0;
     font-size: 1.25rem;
     letter-spacing: -0.03em;
+    line-height: 1.12;
   }
 
   .masthead-tabs {
@@ -1269,6 +1272,7 @@ main {
     min-width: 44px;
     height: 42px;
     padding-inline: 14px;
+    border-radius: 14px;
   }
 
   .filters {
@@ -1292,25 +1296,25 @@ main {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    background: rgba(255, 255, 255, 0.96);
+    background: linear-gradient(180deg, rgba(255, 247, 252, 0.96) 0%, rgba(245, 243, 255, 0.98) 100%);
     backdrop-filter: blur(10px);
     border-top: 1px solid var(--jp-border);
   }
 
   .mobile-bottom-nav button {
     min-height: 42px;
-    border: 1px solid var(--jp-border);
+    border: 1px solid #f4c8de;
     border-radius: 12px;
     background: #fff;
-    color: var(--jp-ink-secondary);
+    color: #7a4868;
     font: inherit;
     font-weight: 700;
   }
 
   .mobile-bottom-nav button.is-active {
-    border-color: var(--jp-teal);
-    color: var(--jp-teal-hover);
-    background: var(--jp-teal-soft);
+    border-color: #ff7eb8;
+    color: #b83280;
+    background: linear-gradient(180deg, #fff0f7 0%, #ffe4f2 100%);
   }
 
   body.mobile-filters-open .filters {

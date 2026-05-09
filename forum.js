@@ -752,9 +752,18 @@
     return window.Fortune500 && window.Fortune500.searchCompanies ? window.Fortune500.searchCompanies(q, n) : [];
   }
   function logoHtml(company, size) {
-    if (window.Fortune500 && window.Fortune500.iconMarkSvg) return window.Fortune500.iconMarkSvg(company, size || 40);
-    var label = esc((company && company.name || "?").slice(0, 2).toUpperCase());
-    return '<span class="fortune-logo-img" style="display:grid;place-items:center;width:' + (size || 40) + 'px;height:' + (size || 40) + 'px">' + label + '</span>';
+    var px = size || 40;
+    var name = (company && (company.name || company.company)) || "Company";
+    var domain = (company && company.domain) || (window.Fortune500 && window.Fortune500.logoUrl ? (window.Fortune500.logoUrl(company, px).match(/domain=([^&]+)/) || [])[1] : "") || "";
+    domain = domain ? decodeURIComponent(domain) : "";
+    var initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0); }).join("").toUpperCase() || "JD";
+    var hue = hashNum((company && (company.slug || company.name)) || name) % 360;
+    var clearbit = domain ? "https://logo.clearbit.com/" + encodeURIComponent(domain) + "?size=" + Math.max(160, px * 4) : "";
+    var google = domain ? "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(domain) + "&sz=" + Math.max(128, px * 4) : "";
+    var imgs = "";
+    if (clearbit) imgs += '<img class="forum-logo-main" src="' + esc(clearbit) + '" alt="' + esc(name) + ' logo" loading="lazy" decoding="async" onerror="this.remove()" />';
+    if (google) imgs += '<img class="forum-logo-fallback" src="' + esc(google) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()" />';
+    return '<span class="forum-logo-chip" style="width:' + px + 'px;height:' + px + 'px;--logo-h:' + hue + '" data-initials="' + esc(initials) + '">' + imgs + '</span>';
   }
   function timeAgo(ts) {
     var diff = Math.max(0, Date.now() - Number(ts || Date.now()));
