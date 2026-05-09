@@ -1,15 +1,15 @@
 (() => {
   const DATA_PATHS = ["data/jobs_restored.csv", "./data/jobs_restored.csv", "/data/jobs_restored.csv"];
   /**
-   * Local-only mode: this build intentionally does NOT call /api/jobs.
-   * It loads the shipped data/jobs_restored.js or data/jobs_restored.csv bundle only.
+   * Public mode: prefer production snapshot data from JobDataPool.
+   * Falls back to bundled local dataset when the upstream snapshot is unavailable.
    */
-  const USE_REMOTE_JOBS = false;
-  const API_JOBS = window.JDP_API_JOBS || "/api/jobs";
+  const USE_REMOTE_JOBS = window.JDP_USE_REMOTE_JOBS !== false;
+  const API_JOBS = window.JDP_API_JOBS || "/.netlify/functions/jobs-snapshot";
   const DIRECT_API_JOBS = window.JDP_DIRECT_API_JOBS || "";
   const LOCAL_LISTINGS_MAX = Math.min(4000, Number(window.JDP_LOCAL_LISTINGS_MAX) || 4000);
-  const REMOTE_BATCH_SIZE = 0;
-  const REMOTE_BATCHES = 0;
+  const REMOTE_BATCH_SIZE = Math.max(1, Number(window.JDP_REMOTE_BATCH_SIZE) || 500);
+  const REMOTE_BATCHES = Math.max(1, Number(window.JDP_REMOTE_BATCHES) || 4);
   const LISTINGS_MAX = Math.min(4000, Number(window.JDP_LISTINGS_MAX) || LOCAL_LISTINGS_MAX);
   const CACHE_KEY = "jdp_merged_jobs_v3";
   const CACHE_TTL_MS = Number(window.JDP_CACHE_TTL_MS) || 60 * 60 * 1000;
@@ -55,10 +55,6 @@
   };
 
   document.addEventListener("DOMContentLoaded", async () => {
-    if (window.HiringCafePinGate?.requireAccess) {
-      const allowed = await window.HiringCafePinGate.requireAccess();
-      if (!allowed) return;
-    }
     init();
   });
 
@@ -90,6 +86,7 @@
     app.els.aiButton = document.querySelector(".ai-btn");
     app.els.menuButton = document.querySelector(".menu-btn");
     app.els.addCareerButton = document.querySelector(".green-btn");
+    app.els.mobileNav = [...document.querySelectorAll("[data-mobile-nav]")];
   }
 
   function bindEvents(){
@@ -108,11 +105,40 @@
     app.els.menuButton?.addEventListener("click", openTopMenu);
     app.els.navJobs?.addEventListener("click", (e) => { e.preventDefault(); location.hash = ""; routeMainView(); });
     app.els.navForums?.addEventListener("click", (e) => { e.preventDefault(); location.hash = "forums"; routeMainView(); });
+    app.els.mobileNav?.forEach(btn => btn.addEventListener("click", () => handleMobileNavAction(btn.dataset.mobileNav)));
     window.addEventListener("hashchange", routeMainView);
     window.addEventListener("online", retryCloudSync);
     bindHeaderFilterChips();
     bindTopbarShortcuts();
     routeMainView();
+  }
+
+  function handleMobileNavAction(action){
+    if (action === "jobs") {
+      location.hash = "";
+      routeMainView();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (action === "forums") {
+      location.hash = "forums";
+      routeMainView();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (action === "search") {
+      location.hash = "";
+      routeMainView();
+      app.els.searchInput?.focus();
+      app.els.searchInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (action === "filters") {
+      location.hash = "";
+      routeMainView();
+      document.body.classList.toggle("mobile-filters-open");
+      document.querySelector(".filters")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function scrollToolbarIntoView(){
@@ -163,10 +189,13 @@
     app.els.forumView?.classList.toggle("hidden", !isForum);
     app.els.navJobs?.classList.toggle("is-active", !isForum);
     app.els.navForums?.classList.toggle("is-active", isForum);
+    document.querySelectorAll(".mobile-bottom-nav [data-mobile-nav]").forEach(btn => btn.classList.remove("is-active"));
+    document.querySelector(`.mobile-bottom-nav [data-mobile-nav="${isForum ? "forums" : "jobs"}"]`)?.classList.add("is-active");
     document.querySelector(".filters")?.classList.toggle("hidden", isForum);
     document.querySelector(".hire-banner")?.classList.toggle("hidden", isForum);
     document.querySelector(".toolbar")?.classList.toggle("hidden", isForum);
     if (isForum) window.dispatchEvent(new CustomEvent("hiringcafe:showforums", { detail: { hash: raw } }));
+    if (isForum) document.body.classList.remove("mobile-filters-open");
   }
 
   function openTopMenu(){
@@ -429,13 +458,32 @@
   }
 
   async function loadJobsDataset(){
-    // Local-only build: avoid /api/jobs entirely so rate limits or 502s cannot affect load.
-    // data/jobs_restored.js is loaded before app.js in index.html and exposes RESTORED_JOBS_CSV.
-    setSync(`Loading ${LOCAL_LISTINGS_MAX.toLocaleString()} bundled listings…`);
+    const cached = readJobsCache();
+    if (cached?.length) {
+      setSync(`Ready — ${cached.length.toLocaleString()} cached listings`);
+      return cached;
+    }
+
+    if (USE_REMOTE_JOBS) {
+      try {
+        setSync(`Loading production snapshot (${(REMOTE_BATCH_SIZE * REMOTE_BATCHES).toLocaleString()} max)…`);
+        const remoteRows = await fetchSampleListingsFromApi();
+        const remoteJobs = normalizeRows(dedupeCsvRows(remoteRows).slice(0, LISTINGS_MAX));
+        if (remoteJobs.length) {
+          writeJobsCache(remoteJobs);
+          setSync(`Ready — ${remoteJobs.length.toLocaleString()} production listings`);
+          return remoteJobs;
+        }
+      } catch (error) {
+        console.warn("Production snapshot unavailable, using bundled dataset.", error);
+      }
+    }
+
+    setSync(`Loading ${LOCAL_LISTINGS_MAX.toLocaleString()} bundled fallback listings…`);
     const localRows = await loadLocalJobsRows();
     const jobs = normalizeRows(dedupeCsvRows(localRows).slice(0, LISTINGS_MAX));
     if (jobs.length) writeJobsCache(jobs);
-    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} local listings` : "Ready — no bundled listings found");
+    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} local fallback listings` : "Ready — no bundled listings found");
     return jobs;
   }
 

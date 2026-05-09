@@ -1,4 +1,3 @@
 User-agent: *
-Disallow: /data/
-Disallow: /*.csv$
-Disallow: /*.js$
+Allow: /
+Sitemap: https://jobdatapool.com/sitemap.xml

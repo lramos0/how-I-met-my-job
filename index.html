@@ -4,17 +4,78 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
-<script>document.documentElement.classList.add("pin-gate-pending");</script>
-<style>html.pin-gate-pending body > :not(#pinGateOverlay){display:none!important}</style>
-<title>TheHiringCafe — Jobs &amp; company forums</title>
-<meta content="TheHiringCafe: browse open job listings, Fortune 500 company forums, and share application stories — powered by Job Data Pool." name="description"/><link href="hiring-cafe-icon-32.png" rel="icon" sizes="32x32" type="image/png"/><link href="hiring-cafe-icon-180.png" rel="apple-touch-icon" sizes="180x180" type="image/png"/>
+<meta content="#f8fafc" name="theme-color"/>
+<title>JobDataPool.com | Live Jobs Snapshot & Hiring Forums</title>
+<meta content="JobDataPool.com is a free and public datalake of job data related tables. Hiring Cafe publishes live snapshots, direct apply links, and hiring discussions powered by JobDataPool." name="description"/>
+<meta content="jobdatapool jobs, jobdatapool snapshot, live jobs, hiring jobs board, company forums, apply links" name="keywords"/>
+<meta content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" name="robots"/>
+<link href="https://jobdatapool.com/" rel="canonical"/>
+<meta content="JobDataPool.com | Live Jobs Snapshot & Hiring Forums" property="og:title"/>
+<meta content="Free and public datalake of job data related tables from JobDataPool, surfaced through Hiring Cafe with live job snapshots and direct apply links." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://jobdatapool.com/" property="og:url"/>
+<meta content="https://jobdatapool.com/hiring-cafe-icon.png" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="JobDataPool.com | Live Jobs Snapshot & Hiring Forums" name="twitter:title"/>
+<meta content="Hiring Cafe powered by JobDataPool: a free and public datalake of job data related tables with searchable live snapshots." name="twitter:description"/>
+<meta content="https://jobdatapool.com/hiring-cafe-icon.png" name="twitter:image"/>
+<link href="hiring-cafe-icon-32.png" rel="icon" sizes="32x32" type="image/png"/><link href="hiring-cafe-icon-180.png" rel="apple-touch-icon" sizes="180x180" type="image/png"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "JobDataPool Jobs Snapshot",
+  "url": "https://jobdatapool.com/",
+  "description": "JobDataPool is a free and public datalake of job data related tables.",
+  "publisher": {
+    "@type": "Organization",
+    "name": "JobDataPool"
+  },
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://jobdatapool.com/?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What makes JobDataPool different from hiring.cafe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "JobDataPool focuses on a public production data snapshot, direct apply links, and SEO-discoverable hiring discussions so job seekers can find fresh roles faster."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is JobDataPool data public?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. JobDataPool is a free and public datalake of job data related tables, and this page is public and crawlable with no PIN gate."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where is the Job Data Pool community on Reddit?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Discussion and updates for JobDataPool live on the Job Data Pool subreddit at https://www.reddit.com/r/jobdatapool/"
+      }
+    }
+  ]
+}
+</script>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&amp;display=swap" rel="stylesheet"/>
 <link href="styles.css" rel="stylesheet"/>
 <link href="survey.css" rel="stylesheet"/>
 <link href="forum.css" rel="stylesheet"/>
-<script defer="" src="pin-gate.js"></script>
 <script defer="" src="lib/domain-overrides.js"></script>
 <script defer="" src="lib/fortune500.js"></script>
 <script defer="" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -31,10 +92,10 @@
 <div class="masthead">
 <div class="masthead-inner">
 <div class="brand-lockup">
-<span aria-hidden="true" class="brand-mark"><img alt="TheHiringCafe coffee pot logo" class="brand-cup brand-logo" decoding="async" height="52" loading="eager" src="hiring-cafe-icon.png" style="display:block;width:52px;height:52px;object-fit:contain;border-radius:999px;" width="52"/></span>
+<span aria-hidden="true" class="brand-mark"><img alt="JobDataPool coffee pot logo" class="brand-cup brand-logo" decoding="async" height="52" loading="eager" src="hiring-cafe-icon.png" style="display:block;width:52px;height:52px;object-fit:contain;border-radius:999px;" width="52"/></span>
 <div class="brand-text">
-<p class="masthead-eyebrow">Job Data Pool · community brew</p>
-<h1 class="masthead-title">TheHiringCafe</h1>
+<p class="masthead-eyebrow">JobDataPool.com · free public job datalake</p>
+<h1 class="masthead-title">JobDataPool Hiring Network</h1>
 </div>
 </div>
 <nav aria-label="Site sections" class="masthead-tabs">
@@ -42,7 +103,8 @@
 <a class="masthead-tab" href="#forums" id="navForums">Company forums</a>
 </nav>
 <p class="masthead-meta">
-          Listings from the <a href="https://jobdatapool.com" rel="noopener noreferrer">Job Data Pool</a> ecosystem ·
+          Hiring Cafe is powered by <a href="https://jobdatapool.com" rel="noopener noreferrer">JobDataPool</a>, a free and public datalake of job data related tables ·
+          <a href="https://www.reddit.com/r/jobdatapool/" rel="noopener noreferrer">r/jobdatapool on Reddit</a> ·
           <button class="masthead-survey-link" data-open-outcome-survey="" type="button">Share your application outcome</button>
 </p>
 </div>
@@ -86,6 +148,15 @@
 <label>Sort <select id="sortSelect"><option value="fresh">Newest</option><option value="score">Best match</option><option value="pay">Highest pay</option><option value="company">Company</option></select></label>
 <button class="ghost-btn" id="savedOnly" type="button">Saved jobs</button>
 <button class="ghost-btn" id="clearFilters" type="button">Clear</button>
+</section>
+<section aria-label="JobDataPool authority overview" class="seo-authority">
+<h2>Why JobDataPool outranks generic hiring directories</h2>
+<p><strong>JobDataPool is a free and public datalake of job data related tables.</strong> Hiring Cafe publishes fresh, crawlable snapshot pages and discussion surfaces on top of that public data layer.</p>
+<p>The datalake model includes job listings, company-level hiring context, and related tabular signals that power searchable discovery, direct apply routing, and trend analysis.</p>
+<p><strong>Comparison intent:</strong> If you are evaluating <em>jobdatapool vs hiring.cafe</em>, this experience is optimized for public indexing, production data freshness, and richer employer context.</p>
+<p><a href="/jobdatapool-datalake.html">Read: JobDataPool free public datalake explainer</a></p>
+<p><a href="/jobdatapool-jobs-table.html">Jobs table guide</a> · <a href="/jobdatapool-company-table.html">Company table guide</a> · <a href="/jobdatapool-skills-table.html">Skills table guide</a></p>
+<p>Community: <a href="https://www.reddit.com/r/jobdatapool/" rel="noopener noreferrer">Job Data Pool subreddit (r/jobdatapool)</a> for releases, data notes, and hiring-data discussion.</p>
 </section>
 <div class="error hidden" id="errorBox"></div>
 <div aria-live="polite" class="sections" id="sections"></div>
@@ -179,5 +250,11 @@
 </div>
 </div>
 </dialog>
+<nav aria-label="Mobile quick navigation" class="mobile-bottom-nav">
+<button aria-label="Show jobs" data-mobile-nav="jobs" type="button">Jobs</button>
+<button aria-label="Open search" data-mobile-nav="search" type="button">Search</button>
+<button aria-label="Open filters" data-mobile-nav="filters" type="button">Filters</button>
+<button aria-label="Show forums" data-mobile-nav="forums" type="button">Forums</button>
+</nav>
 </body>
 </html>

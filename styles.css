@@ -61,6 +61,10 @@ body {
   max-width: 100vw;
 }
 
+.mobile-bottom-nav {
+  display: none;
+}
+
 /* ─── Sticky heading shell ─── */
 .top-shell {
   position: sticky;
@@ -569,6 +573,31 @@ main {
   font-size: 13px;
   color: var(--jp-ink);
   font-weight: 500;
+}
+
+.seo-authority {
+  max-width: 1180px;
+  margin: 0 auto 18px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--jp-border);
+  border-radius: 12px;
+  color: var(--jp-ink-secondary);
+}
+
+.seo-authority h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--jp-ink);
+}
+
+.seo-authority p {
+  margin: 0 0 8px;
+}
+
+.seo-authority p:last-child {
+  margin-bottom: 0;
 }
 
 .primary-btn {
@@ -1222,6 +1251,10 @@ main {
     padding: 8px 12px 10px;
   }
 
+  body {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+
   .search-box {
     height: 44px;
     padding: 0 13px;
@@ -1241,10 +1274,62 @@ main {
   .filters {
     padding: 8px 12px 10px;
     gap: 8px;
+    scroll-padding-inline: 12px;
   }
 
   .filters button {
-    min-height: 36px;
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--jp-border);
+  }
+
+  .mobile-bottom-nav button {
+    min-height: 42px;
+    border: 1px solid var(--jp-border);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--jp-ink-secondary);
+    font: inherit;
+    font-weight: 700;
+  }
+
+  .mobile-bottom-nav button.is-active {
+    border-color: var(--jp-teal);
+    color: var(--jp-teal-hover);
+    background: var(--jp-teal-soft);
+  }
+
+  body.mobile-filters-open .filters {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    z-index: 95;
+    max-height: 48vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 14px;
+    border-top: 1px solid var(--jp-border);
+    box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.16);
+    background: #fff;
+  }
+
+  body.mobile-filters-open .filters .sep {
+    display: none;
   }
 
   main {
