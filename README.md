@@ -38,3 +38,7 @@ You do not need to manually create tables. Firestore collections are created by 
 ## Anti-scraping note
 
 This static restore avoids rendering all apply links as raw anchors, blocks indexing of `/data/`, and adds noindex/noarchive headers for CSV/data assets on hosts that honor `_headers` or `netlify.toml`. A determined scraper can still extract client-side data because the browser must receive it. Real protection requires a backend/API layer with server-side search, sessions, rate limits, bot checks, and signed apply URLs.
+
+## Usage dashboard
+
+The private request dashboard lives at `/usage-dashboard/`. Set `USAGE_DASHBOARD_PIN` in Netlify to enable the same PIN-lock cookie auth used by the other Job Pool apps. The `crawler-tracker` Edge Function records aggregate request counts into Netlify Blobs, and the dashboard reads them through `/.netlify/functions/get-crawler-usage` after auth. The dashboard is marked `noindex,nofollow,noarchive`.

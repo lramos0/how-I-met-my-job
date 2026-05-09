@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TheHiringCafe Usage Dashboard</title>
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-1: #081826;
+        --bg-2: #0f2840;
+        --card: rgba(9, 26, 42, 0.84);
+        --card-border: rgba(119, 176, 232, 0.35);
+        --text: #e8f4ff;
+        --subtle: #9dc4e7;
+        --accent: #2dd4bf;
+        --accent-2: #f59e0b;
+        --danger: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(45, 212, 191, 0.16), transparent 45%),
+          radial-gradient(circle at 85% 20%, rgba(245, 158, 11, 0.16), transparent 38%),
+          linear-gradient(135deg, var(--bg-1), var(--bg-2));
+        color: var(--text);
+        font-family: "Space Grotesk", "Helvetica Neue", sans-serif;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(1.7rem, 2.8vw, 2.5rem);
+        line-height: 1.1;
+      }
+
+      h2 {
+        font-size: clamp(1.05rem, 1.8vw, 1.4rem);
+      }
+
+      .mono {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .muted {
+        color: var(--subtle);
+      }
+
+      .danger {
+        color: var(--danger);
+      }
+
+      .lock-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 16px;
+        transition: opacity 280ms ease, visibility 280ms ease;
+      }
+
+      .lock-card,
+      .card {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(4px);
+      }
+
+      .lock-card {
+        width: min(430px, 96vw);
+        padding: 22px 20px;
+      }
+
+      .lock-form {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .lock-input {
+        flex: 1;
+        min-width: 0;
+        border: 1px solid rgba(157, 196, 231, 0.35);
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: var(--text);
+        background: rgba(11, 29, 45, 0.72);
+        outline: none;
+      }
+
+      .lock-input:focus {
+        border-color: rgba(45, 212, 191, 0.8);
+        box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.25);
+      }
+
+      .lock-btn,
+      .pager-btn,
+      .toggle-btn {
+        cursor: pointer;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .lock-btn {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        background: var(--accent);
+        color: #08202d;
+        font-weight: 700;
+      }
+
+      .lock-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .lock-error {
+        min-height: 1.2em;
+        margin-top: 10px;
+      }
+
+      #dashboardShell {
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: opacity 320ms ease, transform 320ms ease;
+      }
+
+      body.dashboard-unlocked #dashboardShell {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      body.dashboard-unlocked .lock-screen {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .shell {
+        width: min(1180px, 96vw);
+        margin: 22px auto 42px;
+      }
+
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 12px;
+      }
+
+      .topbar-main {
+        display: grid;
+        gap: 12px;
+      }
+
+      .dashboard-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .dashboard-nav-btn {
+        border: 1px solid rgba(157, 196, 231, 0.36);
+        border-radius: 999px;
+        padding: 7px 12px;
+        color: var(--subtle);
+        background: rgba(15, 40, 64, 0.6);
+        text-decoration: none;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.78rem;
+      }
+
+      .dashboard-nav-btn.active {
+        border-color: rgba(45, 212, 191, 0.96);
+        color: #07202f;
+        background: linear-gradient(140deg, rgba(45, 212, 191, 0.98), rgba(96, 165, 250, 0.95));
+      }
+
+      .meta {
+        color: var(--subtle);
+        font-size: 0.82rem;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .cards {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .card {
+        padding: 14px 16px;
+      }
+
+      .card-title {
+        color: var(--subtle);
+        font-size: 0.83rem;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .card-value {
+        font-size: clamp(1.25rem, 2.9vw, 2.05rem);
+        font-weight: 700;
+      }
+
+      .layout,
+      .layout-bottom {
+        display: grid;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .layout {
+        grid-template-columns: 1.35fr 1fr;
+      }
+
+      .layout-bottom {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .layout-single {
+        display: grid;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .pill {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(45, 212, 191, 0.2);
+        color: #90f6e5;
+        font-size: 0.74rem;
+      }
+
+      .toggle-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px;
+        border-radius: 999px;
+        border: 1px solid rgba(157, 196, 231, 0.35);
+        background: rgba(15, 40, 64, 0.55);
+      }
+
+      .toggle-btn {
+        border: 0;
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: var(--subtle);
+        background: transparent;
+        font-size: 0.77rem;
+      }
+
+      .toggle-btn[aria-pressed="true"] {
+        color: #092433;
+        background: rgba(45, 212, 191, 0.95);
+      }
+
+      canvas {
+        width: 100%;
+        height: min(310px, 52vw);
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(22, 51, 75, 0.66), rgba(11, 29, 45, 0.72));
+      }
+
+      #stackedGroupingChart {
+        height: min(360px, 62vw);
+      }
+
+      .stack-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        margin-top: 10px;
+      }
+
+      .stack-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .stack-legend-swatch {
+        width: 11px;
+        height: 11px;
+        border-radius: 3px;
+      }
+
+      .stack-legend-label {
+        color: rgba(230, 245, 255, 0.95);
+        font-size: 0.78rem;
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 9px 8px;
+        border-bottom: 1px solid rgba(157, 196, 231, 0.19);
+      }
+
+      th {
+        color: var(--subtle);
+        font-weight: 500;
+      }
+
+      .table-pager {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .pager-info {
+        color: var(--subtle);
+        font-size: 0.78rem;
+      }
+
+      .pager-btn {
+        border: 1px solid rgba(157, 196, 231, 0.35);
+        border-radius: 9px;
+        padding: 4px 8px;
+        background: rgba(15, 40, 64, 0.6);
+        color: rgba(230, 245, 255, 0.95);
+        font-size: 0.74rem;
+      }
+
+      .pager-btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      @media (max-width: 980px) {
+        .layout,
+        .layout-bottom {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-head {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body data-dashboard-site="thehiringcafe">
+    <section id="lockScreen" class="lock-screen">
+      <article class="lock-card">
+        <h1>Usage Dashboard</h1>
+        <p class="muted" style="margin-top: 8px">Enter PIN to continue.</p>
+        <form id="unlockForm" class="lock-form" autocomplete="off">
+          <input
+            id="pinInput"
+            class="lock-input mono"
+            type="password"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            placeholder="PIN"
+            aria-label="Dashboard PIN"
+            required
+          />
+          <button class="lock-btn" type="submit">Unlock</button>
+        </form>
+        <p id="lockError" class="danger mono lock-error"></p>
+      </article>
+    </section>
+
+    <main id="dashboardShell" class="shell" aria-hidden="true">
+      <div class="topbar">
+        <div class="topbar-main">
+          <h1>TheHiringCafe Usage Dashboard</h1>
+          <p class="muted">Persistent request counts from Netlify Blobs across deploys.</p>
+          <nav class="dashboard-nav" aria-label="Usage dashboard navigation">
+            <a class="dashboard-nav-btn" data-dashboard-site="mewannajob" href="https://mewannajob.com/usage-dashboard/">MWJ Dashboard</a>
+            <a class="dashboard-nav-btn active" data-dashboard-site="thehiringcafe" href="https://thehiringcafe.com/usage-dashboard/">TheHiringCafe Dashboard</a>
+            <a class="dashboard-nav-btn" data-dashboard-site="livejobpool" href="https://jobpool.live/usage-dashboard/">LiveJobPool Dashboard</a>
+            <a class="dashboard-nav-btn" data-dashboard-site="jobdatapool" href="https://jobdatapool.com/x-7d2f19b8c4e6a0f3/">JobDataPool Dashboard</a>
+          </nav>
+        </div>
+        <div class="meta mono">
+          <div>Created: <span id="createdAt">-</span></div>
+          <div>Updated: <span id="updatedAt">-</span></div>
+        </div>
+      </div>
+
+      <section class="grid cards" id="summaryCards">
+        <article class="card">
+          <div class="card-title">Global Requests</div>
+          <div class="card-value mono" id="totalGlobal">0</div>
+        </article>
+        <article class="card">
+          <div class="card-title">Crawler Requests</div>
+          <div class="card-value mono" id="totalCrawler">0</div>
+        </article>
+        <article class="card">
+          <div class="card-title">Crawler Share</div>
+          <div class="card-value mono" id="crawlerPct">0%</div>
+        </article>
+        <article class="card">
+          <div class="card-title">Tracked Bots</div>
+          <div class="card-value mono" id="trackedBots">0</div>
+        </article>
+        <article class="card">
+          <div class="card-title">External Referrals</div>
+          <div class="card-value mono" id="externalReferrals">0</div>
+        </article>
+      </section>
+
+      <section class="layout">
+        <article class="card">
+          <div class="panel-head">
+            <h2>Global vs Webcrawler Requests by Day</h2>
+            <span class="pill">Line chart</span>
+          </div>
+          <canvas id="dailyChart" width="1100" height="360"></canvas>
+        </article>
+        <article class="card">
+          <div class="panel-head">
+            <h2>Bot Totals</h2>
+            <span class="pill">Detected user agents</span>
+          </div>
+          <table id="botTable">
+            <thead>
+              <tr>
+                <th>Bot</th>
+                <th class="mono">Count</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="table-pager" id="botPager"></div>
+        </article>
+      </section>
+
+      <section class="layout-bottom">
+        <article class="card">
+          <div class="panel-head">
+            <h2>Counts by SDK Device</h2>
+            <span class="pill">User-agent/platform</span>
+          </div>
+          <table id="deviceTable">
+            <thead>
+              <tr>
+                <th>SDK Device</th>
+                <th class="mono">Global</th>
+                <th class="mono">Crawler</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="table-pager" id="devicePager"></div>
+        </article>
+        <article class="card">
+          <div class="panel-head">
+            <h2>Daily Totals</h2>
+            <span class="pill">ingestion_date</span>
+          </div>
+          <table id="dateTable">
+            <thead>
+              <tr>
+                <th class="mono">Date</th>
+                <th class="mono">Global</th>
+                <th class="mono">Crawler</th>
+                <th class="mono">Unique IPs</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="table-pager" id="datePager"></div>
+        </article>
+      </section>
+
+      <section class="layout-single">
+        <article class="card">
+          <div class="panel-head">
+            <h2>Request Counts by Day (Stacked)</h2>
+            <div class="toggle-group" id="stackGroupingToggle" role="group" aria-label="Group stacked chart by">
+              <button class="toggle-btn" type="button" data-group-key="ip_addresses" aria-pressed="true">IP Address</button>
+              <button class="toggle-btn" type="button" data-group-key="sdk_devices" aria-pressed="false">SDK Device</button>
+              <button class="toggle-btn" type="button" data-group-key="countries" aria-pressed="false">Country</button>
+            </div>
+          </div>
+          <canvas id="stackedGroupingChart" width="1100" height="390"></canvas>
+          <div class="stack-legend" id="stackLegend"></div>
+        </article>
+      </section>
+
+      <section class="layout-bottom">
+        <article class="card">
+          <div class="panel-head">
+            <h2>Bingbot + Googlebot Occurrences by Day</h2>
+            <span class="pill">Daily bot counts</span>
+          </div>
+          <canvas id="botDailyChart" width="1100" height="360"></canvas>
+        </article>
+        <article class="card">
+          <div class="panel-head">
+            <h2>External Referrer Redirects</h2>
+            <span class="pill">Excludes own host</span>
+          </div>
+          <canvas id="referrerChart" width="1100" height="360"></canvas>
+        </article>
+      </section>
+
+      <p id="error" class="danger mono" style="margin-top: 14px"></p>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      const currencyFormat = new Intl.NumberFormat("en-US");
+      const STACK_GROUPS = { IP: "ip_addresses", SDK_DEVICE: "sdk_devices", COUNTRY: "countries" };
+      const STACK_CATEGORY_LIMIT = 8;
+      const STACK_COLOR_PALETTE = ["#2dd4bf", "#60a5fa", "#f59e0b", "#f97316", "#34d399", "#a78bfa", "#f43f5e", "#22d3ee", "#84cc16"];
+      const TABLE_PAGE_SIZE = { bots: 10, devices: 12, dates: 10 };
+      const DASHBOARD_AUTH_ENDPOINT = "/.netlify/functions/usage-dashboard-auth";
+      const DASHBOARD_PIN_STORAGE_KEY = "usage_dashboard_pin_v1";
+      const DASHBOARD_PIN_HANDOFF_KEY = "dashAuth";
+
+      let activeStackGroup = STACK_GROUPS.IP;
+      let currentByDateRows = [];
+      let dashboardAuthorized = false;
+      let dashboardBootstrapped = false;
+      let chartInstances = {};
+      let tablePageState = { bots: 1, devices: 1, dates: 1 };
+      let cachedBotMap = {};
+      let cachedDeviceMap = {};
+      let cachedDateRows = [];
+
+      function formatCount(value) {
+        return currencyFormat.format(Number(value) || 0);
+      }
+
+      function formatPercent(part, whole) {
+        const p = Number(part) || 0;
+        const w = Number(whole) || 0;
+        return w ? `${((p / w) * 100).toFixed(1)}%` : "0.0%";
+      }
+
+      function formatUtc(ts) {
+        if (!ts) return "-";
+        const d = new Date(ts);
+        if (Number.isNaN(d.getTime())) return String(ts);
+        return d.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+      }
+
+      function formatDateLabel(dateIso) {
+        const parsed = new Date(`${String(dateIso || "")}T00:00:00Z`);
+        if (Number.isNaN(parsed.getTime())) return String(dateIso || "");
+        return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      }
+
+      function uniqueIpCount(row) {
+        return Object.keys(row?.ip_addresses || {}).filter((key) => key && key !== "unknown").length;
+      }
+
+      function setSummaryCards(data) {
+        const globalCount = data?.totals?.global_count || 0;
+        const crawlerCount = data?.totals?.crawler_count || 0;
+        const externalReferrerCount = data?.totals?.external_referrer_count || 0;
+        document.getElementById("totalGlobal").textContent = formatCount(globalCount);
+        document.getElementById("totalCrawler").textContent = formatCount(crawlerCount);
+        document.getElementById("crawlerPct").textContent = formatPercent(crawlerCount, globalCount);
+        document.getElementById("trackedBots").textContent = formatCount(Object.keys(data?.bots || {}).length);
+        document.getElementById("externalReferrals").textContent = formatCount(externalReferrerCount);
+        document.getElementById("createdAt").textContent = formatUtc(data?.created_at);
+        document.getElementById("updatedAt").textContent = formatUtc(data?.updated_at);
+      }
+
+      function encodePinHandoff(pin) {
+        try {
+          return btoa(JSON.stringify({ pin: String(pin || "").trim(), issued_at: Date.now() }));
+        } catch {
+          return "";
+        }
+      }
+
+      function decodePinHandoff(payload) {
+        try {
+          const parsed = JSON.parse(atob(payload || ""));
+          const pin = String(parsed?.pin || "").trim();
+          const issuedAt = Number(parsed?.issued_at) || 0;
+          if (!pin || (issuedAt && Math.abs(Date.now() - issuedAt) > 30 * 60 * 1000)) return "";
+          return pin;
+        } catch {
+          return "";
+        }
+      }
+
+      function consumePinFromHash() {
+        const params = new URLSearchParams(String(window.location.hash || "").replace(/^#/, ""));
+        const payload = params.get(DASHBOARD_PIN_HANDOFF_KEY);
+        if (!payload) return "";
+        params.delete(DASHBOARD_PIN_HANDOFF_KEY);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${params.toString() ? `#${params}` : ""}`);
+        return decodePinHandoff(payload);
+      }
+
+      function rememberDashboardPin(pin) {
+        const normalized = String(pin || "").trim();
+        if (!normalized) return;
+        try {
+          sessionStorage.setItem(DASHBOARD_PIN_STORAGE_KEY, normalized);
+        } catch {}
+        updateDashboardNavLinksWithPin(normalized);
+      }
+
+      function readRememberedDashboardPin() {
+        try {
+          return String(sessionStorage.getItem(DASHBOARD_PIN_STORAGE_KEY) || "").trim();
+        } catch {
+          return "";
+        }
+      }
+
+      function updateDashboardNavLinksWithPin(pin) {
+        const normalized = String(pin || "").trim();
+        document.querySelectorAll(".dashboard-nav-btn").forEach((link) => {
+          const baseHref = link.dataset.baseHref || link.getAttribute("href") || "";
+          if (!link.dataset.baseHref) link.dataset.baseHref = baseHref;
+          if (!normalized) {
+            link.setAttribute("href", baseHref);
+            return;
+          }
+          try {
+            const url = new URL(baseHref, window.location.origin);
+            const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+            hashParams.set(DASHBOARD_PIN_HANDOFF_KEY, encodePinHandoff(normalized));
+            url.hash = hashParams.toString();
+            link.setAttribute("href", url.toString());
+          } catch {
+            link.setAttribute("href", baseHref);
+          }
+        });
+      }
+
+      function paginateRows(rows, pageKey, pageSize) {
+        const safeRows = Array.isArray(rows) ? rows : [];
+        const totalRows = safeRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        const page = Math.min(Math.max(Number(tablePageState[pageKey]) || 1, 1), totalPages);
+        tablePageState[pageKey] = page;
+        return { pageRows: safeRows.slice((page - 1) * pageSize, page * pageSize), page, totalPages, totalRows };
+      }
+
+      function renderTablePager({ containerId, pageKey, pageSize, totalRows, rerender, itemLabel }) {
+        const pager = document.getElementById(containerId);
+        if (!pager) return;
+        pager.innerHTML = "";
+        if (!totalRows) return;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        const currentPage = Math.min(Math.max(Number(tablePageState[pageKey]) || 1, 1), totalPages);
+        tablePageState[pageKey] = currentPage;
+        const info = document.createElement("span");
+        info.className = "pager-info mono";
+        info.textContent = `Page ${currentPage}/${totalPages} - ${formatCount(totalRows)} ${itemLabel}`;
+        pager.appendChild(info);
+        if (totalPages <= 1) return;
+        for (const [label, delta] of [["Prev", -1], ["Next", 1]]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "pager-btn";
+          button.textContent = label;
+          button.disabled = delta < 0 ? currentPage <= 1 : currentPage >= totalPages;
+          button.addEventListener("click", () => {
+            tablePageState[pageKey] += delta;
+            rerender();
+          });
+          pager.appendChild(button);
+        }
+      }
+
+      function renderBotTable(botMap) {
+        const tbody = document.querySelector("#botTable tbody");
+        cachedBotMap = botMap || {};
+        const rows = Object.entries(cachedBotMap).sort((a, b) => Number(b[1]) - Number(a[1]));
+        tbody.innerHTML = "";
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="2" class="muted">No crawler requests yet.</td></tr>';
+          renderTablePager({ containerId: "botPager", pageKey: "bots", pageSize: TABLE_PAGE_SIZE.bots, totalRows: 0, rerender: () => renderBotTable(cachedBotMap), itemLabel: "bots" });
+          return;
+        }
+        const { pageRows, totalRows } = paginateRows(rows, "bots", TABLE_PAGE_SIZE.bots);
+        pageRows.forEach(([bot, count]) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>${bot}</td><td class="mono">${formatCount(count)}</td>`;
+          tbody.appendChild(row);
+        });
+        renderTablePager({ containerId: "botPager", pageKey: "bots", pageSize: TABLE_PAGE_SIZE.bots, totalRows, rerender: () => renderBotTable(cachedBotMap), itemLabel: "bots" });
+      }
+
+      function renderDeviceTable(deviceMap) {
+        const tbody = document.querySelector("#deviceTable tbody");
+        cachedDeviceMap = deviceMap || {};
+        const rows = Object.entries(cachedDeviceMap).sort((a, b) => (Number(b[1]?.global_count) || 0) - (Number(a[1]?.global_count) || 0));
+        tbody.innerHTML = "";
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="3" class="muted">No device data yet.</td></tr>';
+          renderTablePager({ containerId: "devicePager", pageKey: "devices", pageSize: TABLE_PAGE_SIZE.devices, totalRows: 0, rerender: () => renderDeviceTable(cachedDeviceMap), itemLabel: "devices" });
+          return;
+        }
+        const { pageRows, totalRows } = paginateRows(rows, "devices", TABLE_PAGE_SIZE.devices);
+        pageRows.forEach(([device, bucket]) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>${device}</td><td class="mono">${formatCount(bucket?.global_count)}</td><td class="mono">${formatCount(bucket?.crawler_count)}</td>`;
+          tbody.appendChild(row);
+        });
+        renderTablePager({ containerId: "devicePager", pageKey: "devices", pageSize: TABLE_PAGE_SIZE.devices, totalRows, rerender: () => renderDeviceTable(cachedDeviceMap), itemLabel: "devices" });
+      }
+
+      function renderDateTable(dates) {
+        const tbody = document.querySelector("#dateTable tbody");
+        cachedDateRows = [...(dates || [])];
+        const rows = cachedDateRows.sort((a, b) => b.ingestion_date.localeCompare(a.ingestion_date));
+        tbody.innerHTML = "";
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="4" class="muted">No daily data yet.</td></tr>';
+          renderTablePager({ containerId: "datePager", pageKey: "dates", pageSize: TABLE_PAGE_SIZE.dates, totalRows: 0, rerender: () => renderDateTable(cachedDateRows), itemLabel: "days" });
+          return;
+        }
+        const { pageRows, totalRows } = paginateRows(rows, "dates", TABLE_PAGE_SIZE.dates);
+        pageRows.forEach((day) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td class="mono">${day.ingestion_date}</td><td class="mono">${formatCount(day.global_count)}</td><td class="mono">${formatCount(day.crawler_count)}</td><td class="mono">${formatCount(uniqueIpCount(day))}</td>`;
+          tbody.appendChild(row);
+        });
+        renderTablePager({ containerId: "datePager", pageKey: "dates", pageSize: TABLE_PAGE_SIZE.dates, totalRows, rerender: () => renderDateTable(cachedDateRows), itemLabel: "days" });
+      }
+
+      function destroyChartByKey(key) {
+        if (chartInstances[key]) {
+          chartInstances[key].destroy();
+          delete chartInstances[key];
+        }
+      }
+
+      function upsertChart(key, canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+        destroyChartByKey(key);
+        chartInstances[key] = new Chart(canvas.getContext("2d"), config);
+        return chartInstances[key];
+      }
+
+      function baseChartOptions(stacked = false) {
+        return {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.65,
+          plugins: { legend: { labels: { color: "#e8f4ff" } } },
+          scales: {
+            x: { stacked, ticks: { color: "#9dc4e7", maxRotation: 45, minRotation: 20 }, grid: { color: "rgba(157,196,231,.12)" } },
+            y: { stacked, ticks: { color: "#9dc4e7" }, grid: { color: "rgba(157,196,231,.18)" }, beginAtZero: true },
+          },
+        };
+      }
+
+      function drawChart(dates) {
+        const rows = [...(dates || [])].sort((a, b) => a.ingestion_date.localeCompare(b.ingestion_date));
+        const labels = rows.map((r) => formatDateLabel(r.ingestion_date));
+        upsertChart("dailyChart", "dailyChart", {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: "Global requests", data: rows.map((r) => Number(r.global_count) || 0), borderColor: "#2dd4bf", backgroundColor: "rgba(45,212,191,.15)", tension: 0.25, borderWidth: 2, pointRadius: 2 },
+              { label: "Crawler requests", data: rows.map((r) => Number(r.crawler_count) || 0), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.15)", tension: 0.25, borderWidth: 2, pointRadius: 2 },
+            ],
+          },
+          options: baseChartOptions(false),
+        });
+      }
+
+      function getGroupMapForRow(row, groupKey) {
+        if (groupKey === STACK_GROUPS.SDK_DEVICE) return row?.sdk_devices || row?.devices || {};
+        if (groupKey === STACK_GROUPS.COUNTRY) return row?.countries || {};
+        return row?.ip_addresses || {};
+      }
+
+      function stackCategoryLabel(categoryKey) {
+        if (categoryKey === "__other__") return "Other";
+        return categoryKey || "unknown";
+      }
+
+      function buildStackedSeries(dates, groupKey) {
+        const rows = [...(dates || [])].sort((a, b) => a.ingestion_date.localeCompare(b.ingestion_date));
+        const totalsByCategory = new Map();
+        rows.forEach((row) => {
+          Object.entries(getGroupMapForRow(row, groupKey)).forEach(([key, count]) => {
+            totalsByCategory.set(key || "unknown", (totalsByCategory.get(key || "unknown") || 0) + (Number(count) || 0));
+          });
+        });
+        const ranked = [...totalsByCategory.entries()].sort((a, b) => b[1] - a[1]);
+        const keepKeys = ranked.slice(0, STACK_CATEGORY_LIMIT).map(([key]) => key);
+        const keepSet = new Set(keepKeys);
+        const categories = ranked.length > keepKeys.length ? [...keepKeys, "__other__"] : keepKeys;
+        return {
+          labels: rows.map((r) => formatDateLabel(r.ingestion_date)),
+          categories,
+          datasets: categories.map((category, idx) => ({
+            label: stackCategoryLabel(category),
+            data: rows.map((row) => {
+              let sum = 0;
+              for (const [key, count] of Object.entries(getGroupMapForRow(row, groupKey))) {
+                if (category === "__other__" ? !keepSet.has(key) : key === category) sum += Number(count) || 0;
+              }
+              return sum;
+            }),
+            backgroundColor: category === "__other__" ? "rgba(157,196,231,.5)" : STACK_COLOR_PALETTE[idx % STACK_COLOR_PALETTE.length],
+            borderWidth: 0,
+            stack: "stack0",
+          })),
+        };
+      }
+
+      function renderStackLegend(categories) {
+        const legend = document.getElementById("stackLegend");
+        legend.innerHTML = "";
+        categories.forEach((category, idx) => {
+          const item = document.createElement("span");
+          item.className = "stack-legend-item";
+          item.innerHTML = `<span class="stack-legend-swatch" style="background:${category === "__other__" ? "rgba(157,196,231,.5)" : STACK_COLOR_PALETTE[idx % STACK_COLOR_PALETTE.length]}"></span><span class="stack-legend-label mono">${stackCategoryLabel(category)}</span>`;
+          legend.appendChild(item);
+        });
+      }
+
+      function refreshStackedGroupingChart() {
+        document.querySelectorAll("#stackGroupingToggle .toggle-btn").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.groupKey === activeStackGroup));
+        });
+        const series = buildStackedSeries(currentByDateRows, activeStackGroup);
+        renderStackLegend(series.categories);
+        upsertChart("stackedGroupingChart", "stackedGroupingChart", {
+          type: "bar",
+          data: { labels: series.labels, datasets: series.datasets },
+          options: baseChartOptions(true),
+        });
+      }
+
+      function initializeStackGroupToggle() {
+        document.querySelectorAll("#stackGroupingToggle .toggle-btn").forEach((button) => {
+          button.addEventListener("click", () => {
+            activeStackGroup = button.dataset.groupKey || STACK_GROUPS.IP;
+            refreshStackedGroupingChart();
+          });
+        });
+      }
+
+      function drawBingGoogleByDayChart(dates) {
+        const rows = [...(dates || [])].sort((a, b) => a.ingestion_date.localeCompare(b.ingestion_date));
+        upsertChart("botDailyChart", "botDailyChart", {
+          type: "line",
+          data: {
+            labels: rows.map((r) => formatDateLabel(r.ingestion_date)),
+            datasets: [
+              { label: "Bingbot", data: rows.map((r) => Number(r?.bots?.bingbot) || 0), borderColor: "#60a5fa", tension: 0.25, borderWidth: 2, pointRadius: 2 },
+              { label: "Googlebot", data: rows.map((r) => Number(r?.bots?.googlebot) || 0), borderColor: "#f97316", tension: 0.25, borderWidth: 2, pointRadius: 2 },
+            ],
+          },
+          options: baseChartOptions(false),
+        });
+      }
+
+      function drawExternalReferrerChart(referrerMap) {
+        const rows = Object.entries(referrerMap || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 10);
+        upsertChart("referrerChart", "referrerChart", {
+          type: "bar",
+          data: {
+            labels: rows.map(([host]) => host),
+            datasets: [{ label: "Redirects", data: rows.map(([, count]) => Number(count) || 0), backgroundColor: "rgba(45,212,191,.78)" }],
+          },
+          options: {
+            indexAxis: "y",
+            ...baseChartOptions(false),
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+
+      async function loadUsage() {
+        if (!dashboardAuthorized) return;
+        const errorEl = document.getElementById("error");
+        errorEl.textContent = "";
+        try {
+          const response = await fetch("/.netlify/functions/get-crawler-usage", {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+          if (response.status === 401) {
+            lockDashboardUi();
+            throw new Error("Unauthorized");
+          }
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          currentByDateRows = data.by_date || [];
+          setSummaryCards(data);
+          renderBotTable(data.bots || {});
+          renderDeviceTable(data.devices || {});
+          renderDateTable(currentByDateRows);
+          drawChart(currentByDateRows);
+          drawBingGoogleByDayChart(currentByDateRows);
+          refreshStackedGroupingChart();
+          drawExternalReferrerChart(data.external_referrers || {});
+        } catch (error) {
+          errorEl.textContent = `Failed to load usage metrics: ${error.message}`;
+        }
+      }
+
+      function lockDashboardUi() {
+        dashboardAuthorized = false;
+        document.body.classList.remove("dashboard-unlocked");
+        document.getElementById("lockScreen")?.setAttribute("aria-hidden", "false");
+        document.getElementById("dashboardShell")?.setAttribute("aria-hidden", "true");
+      }
+
+      function unlockDashboardUi() {
+        document.body.classList.add("dashboard-unlocked");
+        document.getElementById("lockScreen")?.setAttribute("aria-hidden", "true");
+        document.getElementById("dashboardShell")?.setAttribute("aria-hidden", "false");
+      }
+
+      async function fetchDashboardAuthStatus() {
+        try {
+          const response = await fetch(DASHBOARD_AUTH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store" });
+          if (!response.ok) return { authorized: false, error: `HTTP ${response.status}` };
+          const payload = await response.json();
+          return { authorized: Boolean(payload?.authorized), error: "" };
+        } catch {
+          return { authorized: false, error: "Unable to verify dashboard access." };
+        }
+      }
+
+      async function submitDashboardPin(pin) {
+        try {
+          const response = await fetch(DASHBOARD_AUTH_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            credentials: "same-origin",
+            cache: "no-store",
+            body: JSON.stringify({ pin }),
+          });
+          if (response.status === 204) return { ok: true, error: "" };
+          let errorMessage = response.status === 401 ? "Incorrect PIN." : `HTTP ${response.status}`;
+          try {
+            const payload = await response.json();
+            if (payload?.error) errorMessage = payload.error;
+          } catch {}
+          return { ok: false, error: errorMessage };
+        } catch {
+          return { ok: false, error: "Unable to reach auth service." };
+        }
+      }
+
+      function bootDashboard() {
+        if (!dashboardAuthorized || dashboardBootstrapped) return;
+        dashboardBootstrapped = true;
+        initializeStackGroupToggle();
+        loadUsage();
+      }
+
+      function initializeDashboardLock() {
+        const lockForm = document.getElementById("unlockForm");
+        const pinInput = document.getElementById("pinInput");
+        const lockError = document.getElementById("lockError");
+        const unlockButton = lockForm?.querySelector('button[type="submit"]');
+
+        function setUnlockControlsDisabled(disabled) {
+          pinInput.disabled = Boolean(disabled);
+          if (unlockButton) unlockButton.disabled = Boolean(disabled);
+        }
+
+        lockForm?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          lockError.textContent = "";
+          const enteredPin = String(pinInput.value || "").trim();
+          if (!enteredPin) {
+            lockError.textContent = "Enter PIN.";
+            pinInput.focus();
+            return;
+          }
+          setUnlockControlsDisabled(true);
+          const result = await submitDashboardPin(enteredPin);
+          setUnlockControlsDisabled(false);
+          if (result.ok) {
+            rememberDashboardPin(enteredPin);
+            dashboardAuthorized = true;
+            pinInput.value = "";
+            unlockDashboardUi();
+            bootDashboard();
+            return;
+          }
+          lockError.textContent = result.error || "Incorrect PIN.";
+          pinInput.focus();
+          pinInput.select();
+        });
+
+        setUnlockControlsDisabled(true);
+        (async () => {
+          const transferredPin = consumePinFromHash() || readRememberedDashboardPin();
+          if (transferredPin) {
+            const handoffResult = await submitDashboardPin(transferredPin);
+            if (handoffResult.ok) {
+              rememberDashboardPin(transferredPin);
+              dashboardAuthorized = true;
+              unlockDashboardUi();
+              bootDashboard();
+              return;
+            }
+          }
+
+          const status = await fetchDashboardAuthStatus();
+          if (status.authorized) {
+            dashboardAuthorized = true;
+            unlockDashboardUi();
+            bootDashboard();
+            return;
+          }
+
+          lockDashboardUi();
+          if (status.error && status.error !== "HTTP 401") lockError.textContent = status.error;
+          setUnlockControlsDisabled(false);
+          pinInput.focus();
+        })();
+      }
+
+      updateDashboardNavLinksWithPin(readRememberedDashboardPin());
+      initializeDashboardLock();
+    </script>
+  </body>
+</html>
