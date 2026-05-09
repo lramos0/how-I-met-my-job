@@ -988,15 +988,21 @@
 
   function companyLogoHtml(job, size){
     const domain = job.companyDomain || companyDomain(job.company, job.apply || job.url);
-    const fallback = fallbackLogoSvg(job.company, size);
-    const src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size * 2}`;
-    return `<img class="company-logo-img" src="${escAttr(src)}" width="${size}" height="${size}" alt="${escAttr(job.company)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${fallback.replace(/'/g, "%27")}';" />`;
+    const n = Math.max(96, size * 4);
+    const clearbit = `https://logo.clearbit.com/${encodeURIComponent(domain)}?size=${n}`;
+    const google = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${n}`;
+    const initialsText = initials(job.company);
+    return `<span class="logo-board-chip" style="--logo-h:${logoHue(job.company)}" data-initials="${escAttr(initialsText)}">
+      <img class="company-logo-img company-logo-main" src="${escAttr(clearbit)}" width="${size}" height="${size}" alt="${escAttr(job.company)} logo" loading="lazy" decoding="async" onerror="this.remove()" />
+      <img class="company-logo-img company-logo-fallback" src="${escAttr(google)}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" onerror="this.remove()" />
+    </span>`;
   }
 
-  function fallbackLogoSvg(company, size){
-    const label = initials(company);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="100%" height="100%" rx="12" fill="#fff7ed"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${Math.max(12, size/3)}" font-weight="800" fill="#7c2d12">${esc(label)}</text></svg>`;
-    return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
+  function logoHue(name){
+    const text = String(name || "");
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    return hash % 360;
   }
 
   function setSync(s){ app.els.syncStatus.textContent = s; }
