@@ -67,7 +67,7 @@
     initFirebaseWhenReady();
     updateAccountUi();
     try {
-      setSync("Loading job listings…");
+      setSync("Warming up listings…");
       app.jobs = await loadJobsDataset();
       populateFilters(app.jobs);
       await loadState();
@@ -412,17 +412,16 @@
   }
 
   /**
-   * Fetches exactly the requested four 500-listing pages from a same-origin proxy.
-   * Browsers cannot read Job Data Pool directly unless their API sends CORS headers.
+   * Fetches paged listings from a same-origin proxy. Batches run in parallel so
+   * total wait time is roughly one round-trip instead of four sequential ones.
    */
   async function fetchSampleListingsFromApi(){
     const headers = { Accept: "application/json" };
-    const batches = [];
     const failures = [];
     const endpoints = [API_JOBS];
     if (DIRECT_API_JOBS) endpoints.push(DIRECT_API_JOBS);
 
-    for (let batch = 0; batch < REMOTE_BATCHES; batch++) {
+    async function fetchOneBatch(batch){
       const offset = batch * REMOTE_BATCH_SIZE;
       const params = new URLSearchParams({
         limit: String(REMOTE_BATCH_SIZE),
@@ -430,23 +429,29 @@
         page: String(batch + 1),
         country_code: "US"
       });
-
-      let loadedThisBatch = false;
       for (const endpoint of endpoints) {
         try {
           const res = await fetch(`${endpoint}?${params}`, { headers, cache: "no-store", credentials: "same-origin" });
           if (!res.ok) throw new Error(`GET ${endpoint} batch ${batch + 1} returned ${res.status}`);
           const rows = extractJobsPayload(await res.json());
           if (!rows.length) throw new Error(`GET ${endpoint} batch ${batch + 1} returned no jobs`);
-          batches.push(...rows);
-          loadedThisBatch = true;
-          break;
+          return rows;
         } catch (err) {
           failures.push(err.message || String(err));
         }
       }
+      return null;
+    }
 
-      if (!loadedThisBatch) break;
+    const batchRows = await Promise.all(
+      Array.from({ length: REMOTE_BATCHES }, (_, batch) => fetchOneBatch(batch))
+    );
+
+    const batches = [];
+    for (let i = 0; i < batchRows.length; i++) {
+      const rows = batchRows[i];
+      if (!rows?.length) break;
+      batches.push(...rows);
     }
 
     if (!batches.length && failures.length) throw new Error(failures[0]);
@@ -461,18 +466,18 @@
   async function loadJobsDataset(){
     const cached = readJobsCache();
     if (cached?.length) {
-      setSync(`Ready — ${cached.length.toLocaleString()} cached listings`);
+      setSync("Ready");
       return cached;
     }
 
     if (USE_REMOTE_JOBS) {
       try {
-        setSync(`Loading production snapshot (${(REMOTE_BATCH_SIZE * REMOTE_BATCHES).toLocaleString()} max)…`);
+        setSync("Fetching latest snapshot…");
         const remoteRows = await fetchSampleListingsFromApi();
         const remoteJobs = normalizeRows(dedupeCsvRows(remoteRows).slice(0, LISTINGS_MAX));
         if (remoteJobs.length) {
           writeJobsCache(remoteJobs);
-          setSync(`Ready — ${remoteJobs.length.toLocaleString()} production listings`);
+          setSync("Ready");
           return remoteJobs;
         }
       } catch (error) {
@@ -480,11 +485,11 @@
       }
     }
 
-    setSync(`Loading ${LOCAL_LISTINGS_MAX.toLocaleString()} bundled fallback listings…`);
+    setSync("Loading backup listings…");
     const localRows = await loadLocalJobsRows();
     const jobs = normalizeRows(dedupeCsvRows(localRows).slice(0, LISTINGS_MAX));
     if (jobs.length) writeJobsCache(jobs);
-    setSync(jobs.length ? `Ready — ${jobs.length.toLocaleString()} local fallback listings` : "Ready — no bundled listings found");
+    setSync(jobs.length ? "Ready" : "No listings in backup bundle");
     return jobs;
   }
 
@@ -591,7 +596,7 @@
   function payMax(pay){ const nums=(pay.match(/\$?([0-9]+(?:\.[0-9]+)?)(k)?/ig)||[]).map(x=>{ const k=/k/i.test(x); const n=Number(x.replace(/[^0-9.]/g,"")); return k?n*1000:n; }); return nums.length?Math.max(...nums):0; }
 
   function render(){
-    app.els.resultCount.textContent = homepageCountLabel(app.filtered.length);
+    app.els.resultCount.textContent = homepageCountLabel();
     const groups = buildGroups(app.filtered);
     app.els.sections.innerHTML = groups.map(([name, jobs], i) => sectionHtml(name, jobs, i)).join("");
     bindRenderedActions();
@@ -792,9 +797,11 @@
       app.els.accountButton.textContent = logged ? (app.profile?.displayName || app.user.name || "Profile") : "Join";
       app.els.accountButton.setAttribute("aria-label", logged ? "Open your profile and account panel" : "Join or sign in");
     }
+    const panelTitle = document.getElementById("accountPanelTitle");
+    if (panelTitle) panelTitle.textContent = logged ? "You’re in" : "Your spot";
     if (app.els.accountStatus) app.els.accountStatus.textContent = logged
-      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. ${app.cloudOffline ? "Firestore is unreachable right now, so changes are kept in this browser and will retry when the connection comes back." : `Saved jobs stay private; ${app.user.google ? "forum posts, comments, votes, and profile data sync through Firestore" : "local forum activity stays in this browser"}.`}`
-      : "Create a profile to save jobs, post in company forums, comment, and vote. Google syncs across devices; local mode is just for this browser.";
+      ? `Signed in as ${app.profile?.displayName || app.user.name || app.user.email}. ${app.cloudOffline ? "Cloud is having a moment — your edits stay on this device until we reconnect." : `Saved roles stay private. ${app.user.google ? "Posts, comments, votes, and profile sync in the cloud." : "Forum activity stays in this browser only."}`}`
+      : "Pick Google for sync everywhere, or a local profile for a quiet, this-browser-only nook.";
     app.els.logoutButton?.classList.toggle("hidden", !logged);
     app.els.googleLogin?.classList.toggle("hidden", logged);
     app.els.localLogin?.classList.toggle("hidden", logged);
@@ -805,15 +812,16 @@
   function renderProfilePanel(){
     const panel = app.els.accountPanel;
     if (!panel) return;
+    const mount = document.getElementById("profileCardMount") || panel;
     let card = panel.querySelector("#profileCard");
     if (!card) {
       card = document.createElement("div");
       card.id = "profileCard";
       card.className = "profile-card";
-      panel.append(card);
     }
+    if (card.parentElement !== mount) mount.appendChild(card);
     if (!app.user) {
-      card.innerHTML = `<h3>Your profile</h3><p>Join or try a local profile to unlock saved jobs, posts, comments, and voting.</p>`;
+      card.innerHTML = `<div class="profile-card-empty"><span class="profile-card-empty-icon" aria-hidden="true">🌷</span><h3>Almost there</h3><p>Sign in above to edit your public name, headline, and bio for the forums.</p></div>`;
       return;
     }
     const profile = app.profile || defaultProfile();
@@ -824,13 +832,25 @@
     const posts = Math.max(Number(stats.posts || 0), localPosts);
     const comments = Math.max(Number(stats.comments || 0), localComments);
     const votes = Math.max(Number(stats.votesCast || 0), localVotes);
+    const av = esc(initials(profile.displayName || app.user.name || "?"));
     card.innerHTML = `
-      <h3>Your profile</h3>
-      <label>Display name <input id="profileDisplayName" value="${escAttr(profile.displayName || '')}" placeholder="Display name"></label>
-      <label>Headline <input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="Software engineer, student, recruiter..."></label>
-      <label>Bio <textarea id="profileBio" placeholder="What should people know when they see your posts?">${esc(profile.bio || "")}</textarea></label>
-      <div class="profile-stats"><span>${posts} posts</span><span>${comments} comments</span><span>${votes} votes cast</span><span>${Object.keys(app.state.saved || {}).length} saved jobs</span></div>
-      <button class="primary-btn" id="saveProfileBtn" type="button">Save profile</button>
+      <div class="profile-card-top">
+        <div class="profile-avatar" aria-hidden="true">${av}</div>
+        <div>
+          <h3 class="profile-card-title">Profile</h3>
+          <p class="profile-card-sub">Shown next to forum posts</p>
+        </div>
+      </div>
+      <label class="profile-field"><span class="profile-field-label">Name</span><input id="profileDisplayName" value="${escAttr(profile.displayName || '')}" placeholder="How you’d like to appear" autocomplete="nickname"></label>
+      <label class="profile-field"><span class="profile-field-label">Headline</span><input id="profileHeadline" value="${escAttr(profile.headline || '')}" placeholder="e.g. Backend engineer · NYC"></label>
+      <label class="profile-field"><span class="profile-field-label">Bio</span><textarea id="profileBio" placeholder="A line or two about what you care about">${esc(profile.bio || "")}</textarea></label>
+      <ul class="profile-stat-pills" aria-label="Your activity">
+        <li><span class="profile-stat-n">${posts}</span> posts</li>
+        <li><span class="profile-stat-n">${comments}</span> comments</li>
+        <li><span class="profile-stat-n">${votes}</span> votes</li>
+        <li><span class="profile-stat-n">${Object.keys(app.state.saved || {}).length}</span> saved</li>
+      </ul>
+      <button class="primary-btn profile-save-btn" id="saveProfileBtn" type="button">Save profile</button>
     `;
     card.querySelector("#saveProfileBtn")?.addEventListener("click", saveProfileFromPanel);
   }
@@ -959,13 +979,13 @@
     app.counters.companies += Math.min(900, minutes * 3 + Math.floor(Math.random() * 7));
     app.counters.updatedAt = now;
     localStorage.setItem(COUNTER_KEY, JSON.stringify(app.counters));
-    if (app.filtered) app.els.resultCount.textContent = homepageCountLabel(app.filtered.length);
+    if (app.filtered) app.els.resultCount.textContent = homepageCountLabel();
     navigator.serviceWorker?.controller?.postMessage({ type: "HC_COUNTERS", counters: app.counters });
   }
 
-  function homepageCountLabel(realFiltered){
+  function homepageCountLabel(){
     const counters = app.counters || { companies: 5600000, jobs: 3100000 };
-    return `${formatLarge(counters.jobs)} jobs · ${formatLarge(counters.companies)} companies · ${Number(realFiltered || 0).toLocaleString()} loaded`;
+    return `${formatLarge(counters.jobs)} jobs · ${formatLarge(counters.companies)} companies`;
   }
 
   function formatLarge(n){ return Math.round(Number(n || 0)).toLocaleString(); }

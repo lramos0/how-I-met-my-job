@@ -120,8 +120,23 @@
 <button aria-label="Menu" class="menu-btn" type="button">☰</button>
 </header>
 <nav aria-label="Job filters" class="filters">
-<button data-filter="Departments">Departments</button><button data-filter="Salary">Salary</button><button data-filter="Commitment">Commitment</button><button data-filter="Experience">Experience</button><button data-filter="Job Titles &amp; Keywords">Job Titles &amp; Keywords</button><button data-filter="Education">Education</button><button data-filter="Licenses &amp; Certifications">Licenses &amp; Certifications</button><button data-filter="Security Clearance">Security Clearance</button><button data-filter="Languages">Languages</button><button data-filter="Shifts &amp; Schedules">Shifts &amp; Schedules</button>
-<button data-filter="Travel Requirement">Travel Requirement</button><button data-filter="Benefits &amp; Perks">Benefits &amp; Perks</button><button data-filter="Encouraged to Apply">Encouraged to Apply</button><span class="sep"></span><button class="orange" data-filter="Company">Company</button><button class="orange" data-filter="Industry">Industry</button><button class="orange" data-filter="Stage &amp; Funding">Stage &amp; Funding</button><button class="orange" data-filter="Size">Size</button><button class="orange" data-filter="Founding Year">Founding Year</button>
+<div class="filters-inner">
+<p class="filters-kicker"><span class="filters-kicker-icon" aria-hidden="true">✦</span> Quick refine <span class="filters-hint">stacks with search above</span></p>
+<div class="filter-pills" role="toolbar" aria-label="Quick job filters">
+<button class="filter-pill filter-pill--accent" data-filter="Industry" type="button">Industry</button>
+<button class="filter-pill filter-pill--accent" data-filter="Company" type="button">Company</button>
+<button class="filter-pill filter-pill--accent" data-filter="Experience" type="button">Level</button>
+<button class="filter-pill" data-filter="Salary" type="button">Pay listed</button>
+<button class="filter-pill" data-filter="Commitment" type="button">Role type</button>
+<span class="filter-pill-sep" aria-hidden="true"></span>
+<button class="filter-pill" data-filter="Remote" type="button">Remote</button>
+<button class="filter-pill" data-filter="Hybrid" type="button">Hybrid</button>
+<button class="filter-pill" data-filter="Healthcare" type="button">Healthcare</button>
+<button class="filter-pill" data-filter="Software" type="button">Software</button>
+<button class="filter-pill" data-filter="Finance" type="button">Finance</button>
+<button class="filter-pill" data-filter="Entry Level" type="button">Entry level</button>
+</div>
+</div>
 </nav>
 <div class="hire-banner" role="note">
 <span class="hire-banner-text">Know a company that is hiring?</span>
@@ -131,23 +146,34 @@
 <main>
 <div id="jobsMain">
 <section aria-live="polite" class="account-panel hidden" id="accountPanel">
-<div>
-<h2>Join or sign in</h2>
-<p id="accountStatus">Create a profile to save jobs, post in company forums, comment, and vote. Google syncs across devices; local mode is just for this browser.</p>
-</div>
+<div class="account-panel-inner">
+<div class="account-panel-hero" aria-hidden="true"><span class="account-panel-mug">☕</span></div>
+<div class="account-panel-copy">
+<h2 id="accountPanelTitle">Your spot</h2>
+<p id="accountStatus">Save roles, hang out in forums, and keep everything in sync—or stay cozy in local-only mode.</p>
 <div class="account-actions">
 <button class="primary-btn" id="googleLogin" type="button">Continue with Google</button>
-<button class="ghost-btn" id="localLogin" type="button">Try local profile</button>
+<button class="ghost-btn" id="localLogin" type="button">Local profile only</button>
 <button class="ghost-btn hidden" id="logoutButton" type="button">Log out</button>
 </div>
+</div>
+<div id="profileCardMount" class="profile-card-mount"></div>
+</div>
 </section>
-<section aria-label="Result controls" class="toolbar">
-<div><b id="resultCount">Loading jobs…</b><small id="syncStatus">Dataset initializing</small></div>
-<label>Industry <select id="industryFilter"><option value="">All</option></select></label>
-<label>Experience <select id="seniorityFilter"><option value="">All</option></select></label>
-<label>Sort <select id="sortSelect"><option value="fresh">Newest</option><option value="score">Best match</option><option value="pay">Highest pay</option><option value="company">Company</option></select></label>
-<button class="ghost-btn" id="savedOnly" type="button">Saved jobs</button>
-<button class="ghost-btn" id="clearFilters" type="button">Clear</button>
+<section aria-label="Result controls" class="toolbar job-toolbar">
+<div class="job-toolbar-head">
+<b id="resultCount">Live index</b>
+<small id="syncStatus">Getting ready…</small>
+</div>
+<div class="job-toolbar-row">
+<label class="toolbar-field"><span class="toolbar-field-label">Industry</span> <select id="industryFilter"><option value="">All industries</option></select></label>
+<label class="toolbar-field"><span class="toolbar-field-label">Level</span> <select id="seniorityFilter"><option value="">All levels</option></select></label>
+<label class="toolbar-field"><span class="toolbar-field-label">Sort</span> <select id="sortSelect"><option value="fresh">Newest</option><option value="score">Best match</option><option value="pay">Pay</option><option value="company">Company A–Z</option></select></label>
+<div class="toolbar-actions">
+<button class="ghost-btn toolbar-chip" id="savedOnly" type="button">Saved</button>
+<button class="ghost-btn toolbar-chip" id="clearFilters" type="button">Reset filters</button>
+</div>
+</div>
 </section>
 <section aria-label="JobDataPool authority overview" class="seo-authority">
 <p class="seo-authority-kicker">Notice</p>
